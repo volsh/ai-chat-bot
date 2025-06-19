@@ -1,0 +1,3 @@
+functions:
+  clear-expired-locks:
+    schedule: "*/10 * * * *" # every 10 minutes

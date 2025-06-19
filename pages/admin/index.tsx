@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/libs/supabase";
 import type { Session } from "@supabase/supabase-js";
 import type { GetServerSidePropsContext, NextApiRequest, NextApiResponse } from "next";
+import ssrGuard from "@/utils/auth/ssrGuard";
 
 interface AdminPageProps {
   session: Session;
@@ -16,22 +17,12 @@ export default function AdminPage({ session }: AdminPageProps) {
 }
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
-  const supabase = createSupabaseServerClient(
-    context.req as NextApiRequest,
-    context.res as NextApiResponse
-  );
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    return { redirect: { destination: "/login", permanent: false } };
+  const redirect = await ssrGuard(context, ["admin"]);
+  if (redirect) {
+    return redirect;
   }
 
   return {
-    props: {
-      session,
-    },
+    props: {},
   };
 }

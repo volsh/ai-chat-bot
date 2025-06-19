@@ -1,21 +1,25 @@
 "use client";
+import { useTheme } from "@/context/themeContext";
+import Button from "./ui/button";
 import { useEffect, useState } from "react";
 
 export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
+    setMounted(true);
   }, []);
 
-  const toggle = () => {
-    document.documentElement.classList.toggle("dark");
-    setIsDark(!isDark);
-  };
+  if (!mounted) return null;
+
+  const nextTheme = theme === "system" ? "dark" : theme === "dark" ? "light" : "system";
+
+  const label = nextTheme === "dark" ? "🌙 Dark" : nextTheme === "light" ? "☀ Light" : "🖥 System";
 
   return (
-    <button onClick={toggle} className="text-sm underline">
-      {isDark ? "☀ Light" : "🌙 Dark"}
-    </button>
+    <Button onClick={() => setTheme(nextTheme)} className="text-sm underline">
+      {label}
+    </Button>
   );
 }

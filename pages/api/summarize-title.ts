@@ -1,17 +1,34 @@
-import { openai } from "@/libs/ai/client";
+// pages/api/summarize-title.ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import OpenAI from "openai";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { message } = req.body;
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const summary = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [
-      { role: "system", content: "Summarize this message in 3–5 words as a session title." },
-      { role: "user", content: message },
-    ],
-  });
+  const { messages } = req.body;
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: "Invalid messages array" });
+  }
 
-  const title = summary?.choices?.[0]?.message?.content?.trim().replace(/[".]/g, "") ?? "New Chat";
-  res.status(200).json({ title });
+  try {
+    const { choices } = await openai.chat.completions.create({
+      model: "gpt-4-1106-preview",
+      messages: [
+        { role: "system", content: "Summarize the conversation in one short sentence." },
+        ...messages,
+      ],
+      temperature: 0.3,
+    });
+
+    const title = choices?.[0]?.message?.content?.trim();
+    res.status(200).json({ title });
+  } catch (err) {
+    if (!!err && typeof err === "object" && "code" in err && err.code === "insufficient_quota") {
+      return res.status(429).json({ error: "Quota exceeded. Try again later." });
+    }
+    console.error("OpenAI summary error:", err);
+    res.status(500).json({ error: "Failed to generate summary" });
+  }
 }

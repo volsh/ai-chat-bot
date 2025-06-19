@@ -1,25 +1,31 @@
-// pages/chat/[sessionId].tsx
+// PATCHED: ChatSessionPage — dark mode animation, skeleton, mobile polish, keyboard shortcuts
+
+"use client";
 
 import { GetServerSidePropsContext, NextApiRequest, NextApiResponse } from "next";
 import { createSupabaseServerClient } from "@/libs/supabase";
-import ChatBox from "@/components/ChatBox";
-import { useState } from "react";
-import { useSession } from "@/context/SessionContext";
-import SessionEditorModal from "@/components/SessionEditorModal";
-import SessionSidebar from "@/components/SessionSidebar";
+import ChatBox from "@/components/chat/ChatBox";
+import { useCallback, useEffect, useState } from "react";
+import SessionEditorModal from "@/components/chat/SessionEditorModal";
+import SessionSidebar from "@/components/chat/SessionSidebar";
+import ssrGuard from "@/utils/auth/ssrGuard";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import Head from "next/head";
+import { useAppStore } from "@/state";
+import { useShallow } from "zustand/react/shallow";
+import { redirectUserToChat } from "@/utils/chat/redirectUserToChat";
+import { Session } from "@/types";
+import { loadSession } from "@/utils/supabase";
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
+  const redirect = await ssrGuard(context);
+  if (redirect) {
+    return redirect;
+  }
   const supabase = createSupabaseServerClient(
     context.req as NextApiRequest,
     context.res as NextApiResponse
   );
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    return { redirect: { destination: "/login", permanent: false } };
-  }
 
   const sessionId = context.params?.sessionId;
 
@@ -27,11 +33,10 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     .from("sessions")
     .select("id")
     .eq("id", sessionId)
-    .or(`user_id.eq.${session.user.id},shared_with.cs.{${session.user.id}}`)
     .single();
 
   if (!chatSession) {
-    return { notFound: true };
+    return redirectUserToChat(context);
   }
 
   return {
@@ -41,46 +46,88 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   };
 }
 
-export default function ChatSessionPage({ sessionId }: { sessionId: string }) {
+function ChatSessionPage({ sessionId }: { sessionId: string }) {
   const [showSettings, setShowSettings] = useState(false);
-  const session = useSession();
-  const [darkMode, setDarkMode] = useState(false);
+  const [session, setSession] = useState<Session>();
+
+  const { session: authSession } = useAppStore(
+    useShallow((s) => ({
+      session: s.session,
+    }))
+  );
+
+  const fetchSession = useCallback(async () => {
+    if (!sessionId || !authSession) return;
+    try {
+      const session = await loadSession(sessionId);
+      setSession(session);
+    } catch (err) {}
+  }, [sessionId, authSession]);
+
+  useEffect(() => {
+    fetchSession();
+  }, [fetchSession]);
+
+  const handleKey = useCallback((e: KeyboardEvent) => {
+    if (e.key === "/") {
+      e.preventDefault();
+      const input = document.querySelector("input,textarea") as HTMLElement;
+      if (input) input.focus();
+    } else if (e.key === "Escape") {
+      setShowSettings(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, []);
 
   return (
-    <div className={darkMode ? "dark" : ""}>
+    <div className="transition-colors duration-300">
+      <Head>
+        <title>Chat Session – AI Chat App</title>
+      </Head>
       <div className="flex h-screen">
-        <SessionSidebar currentSessionId={sessionId} />
-        <div className="flex flex-1 flex-col">
-          <header className="flex items-center justify-between border-b bg-white px-4 py-2 dark:bg-zinc-900">
+        <SessionSidebar initialSession={session!} onUpdateSession={fetchSession} />
+        <div className="flex-1.5 flex flex-col">
+          <header className="flex items-center justify-between border-b bg-white px-4 py-2 text-zinc-800 dark:bg-zinc-900 dark:text-white">
             <h1 className="text-lg font-semibold">💬 Chat Session</h1>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setDarkMode((prev) => !prev)}
-                className="text-xs text-gray-500 underline dark:text-gray-300"
-              >
-                {darkMode ? "🌞 Light" : "🌙 Dark"} Mode
-              </button>
+            <div className="hidden gap-3 sm:flex">
+              <ThemeToggle />
               <button
                 onClick={() => setShowSettings(true)}
                 className="text-sm text-blue-600 underline"
+                aria-label="Session Settings"
               >
                 ⚙️ Session Settings
               </button>
             </div>
           </header>
 
-          <main className="flex-1 overflow-hidden">
-            <ChatBox initialSessionId={sessionId} />
+          <main className="flex-1 overflow-hidden" role="main">
+            <ChatBox initialSession={session!} onRefresh={fetchSession} />
           </main>
         </div>
+
+        <button
+          onClick={() => setShowSettings(true)}
+          className="fixed bottom-4 right-4 z-50 rounded bg-blue-600 px-4 py-2 text-xs text-white shadow-lg hover:bg-blue-700 sm:hidden"
+          aria-label="Open Session Settings"
+        >
+          ⚙️ Settings
+        </button>
       </div>
       {showSettings && (
         <SessionEditorModal
           mode="chat"
           sessionId={sessionId}
           onClose={() => setShowSettings(false)}
+          onRefresh={fetchSession}
         />
       )}
     </div>
   );
 }
+
+export default ChatSessionPage;

@@ -1,60 +1,35 @@
-import ChatBox from "@/components/ChatBox";
-import SessionSidebar from "@/components/SessionSidebar";
-import { createSupabaseServerClient } from "@/libs/supabase";
+// pages/index.tsx
 import { GetServerSidePropsContext, NextApiRequest, NextApiResponse } from "next";
-
-export default function HomePage({ sessionId }: { sessionId: string }) {
-  <div className="flex h-screen">
-    <SessionSidebar currentSessionId={sessionId} />
-    return <ChatBox initialSessionId={sessionId} />;
-  </div>;
-}
+import { redirectUserToChat } from "@/utils/chat/redirectUserToChat";
+import ssrGuard from "@/utils/auth/ssrGuard";
+import { createSupabaseServerClient } from "@/libs/supabase";
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
-  const supabase = createSupabaseServerClient(
-    context.req as NextApiRequest,
-    context.res as NextApiResponse
-  );
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    return { redirect: { destination: "/login", permanent: false } };
+  const redirect = await ssrGuard(context);
+  if (redirect) {
+    return redirect;
   }
+  const { req, res } = context;
+  const supabase = createSupabaseServerClient(req as NextApiRequest, res as NextApiResponse);
 
-  // 🧠 Fetch the last chat session for this user from your Supabase `sessions` table
-  const { data: lastSession } = await supabase
-    .from("sessions")
-    .select("id")
-    .eq("user_id", session.user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+  const { data: userData } = await supabase.auth.getUser();
 
-  let sessionId = lastSession?.id ?? null;
+  const { user } = userData;
 
-  if (!sessionId) {
-    const { data: newSession, error: createErr } = await supabase
-      .from("sessions")
-      .insert([
-        {
-          user_id: session.user.id,
-          title: "New Chat Session",
-        },
-      ])
-      .select()
-      .single();
+  const { data: profile } = await supabase.from("users").select("role").eq("id", user?.id).single();
 
-    sessionId = newSession?.id ?? null;
-  }
+  const role = profile?.role;
+
+  const destination = role === "therapist" ? "/dashboard/therapist" : redirectUserToChat(context);
 
   return {
-    props: {
-      session,
-      sessionId: lastSession?.id ?? null,
-      isNewSession: !lastSession,
+    redirect: {
+      destination,
+      permanent: false,
     },
   };
+}
+
+export default function HomePage() {
+  return null; // SSR-only
 }
