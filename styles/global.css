@@ -45,7 +45,7 @@ body {
   padding: 0;
   margin: 0;
   font-family: system-ui, sans-serif;
-  @apply bg-white text-black transition-colors duration-300 dark:bg-zinc-900 dark:text-white;
+  @apply bg-white text-zinc-700 transition-colors duration-300 dark:bg-zinc-900 dark:text-white;
 }
 
 body {

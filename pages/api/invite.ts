@@ -29,16 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "You cannot invite yourself." });
   }
 
-  const { count } = await supabase
-    .from("invite_logs")
-    .select("*", { count: "exact", head: true })
-    .eq("to_email", email)
-    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-  if ((count || 0) >= 10) {
-    return res.status(429).json({ error: "You can only send 10 invites per day." });
-  }
-
   const { data: profile } = await supabase.from("users").select().eq("id", user?.id).single();
 
   // Call the Edge Function
@@ -55,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (funcError) {
     console.error("Edge function error:", funcError);
-    return res.status(500).json({ error: "Failed to send invite" });
+    return res.status(500).json({ error: `Failed to send invite ${funcError}` });
   }
 
   return res.status(200).json({ success: true });

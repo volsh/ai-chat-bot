@@ -29,13 +29,13 @@ export default function SearchUsers({
 }: SearchUsersProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<UserOption[]>([]);
-  const [selected, setSelected] = useState<string | undefined>(value);
+  const [selected, setSelected] = useState<string | undefined>();
 
   useEffect(() => {
-    if (value !== selected) {
+    if (typeof value !== "undefined" && value !== selected) {
       setSelected(value);
     }
-  }, [value]);
+  }, [value, selected]);
 
   const search = useMemo(
     () =>
@@ -64,6 +64,7 @@ export default function SearchUsers({
         }
 
         setResults(options);
+        handleSelect(options[0].value, options);
       }, 400),
     [allowCustom]
   );
@@ -76,8 +77,8 @@ export default function SearchUsers({
     }
   }, [query, search]);
 
-  const handleSelect = (value: string) => {
-    const option = results.find((r) => r.value === value) || {
+  const handleSelect = (value: string, options: UserOption[]) => {
+    const option = options.find((r) => r.value === value) || {
       label: value,
       value,
       __isNew__: true,
@@ -100,7 +101,7 @@ export default function SearchUsers({
         <Select
           options={results}
           value={selected}
-          onChange={(e) => handleSelect(e.target.value)}
+          onChange={(e) => handleSelect(e.target.value, results)}
           disabled={disabled}
         />
       )}

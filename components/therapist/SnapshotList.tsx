@@ -1,4 +1,3 @@
-// components/therapist/SnapshotList.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -8,19 +7,29 @@ import { toast } from "react-hot-toast";
 import StatusBadge from "../StatusBadge";
 import { Tooltip } from "react-tooltip";
 
+const SNAPSHOTS_PER_PAGE = 10;
+
 export default function SnapshotList() {
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const loadSnapshots = async () => {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from("fine_tune_snapshots")
-        .select("id, created_at, version, filters, job_status")
-        .order("created_at", { ascending: false });
+        .select("id, created_at, version, filters, job_status", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range((currentPage - 1) * SNAPSHOTS_PER_PAGE, currentPage * SNAPSHOTS_PER_PAGE - 1);
 
-      if (error) toast.error("Failed to load snapshots");
+      if (error) {
+        toast.error("Failed to load snapshots");
+        return;
+      }
+
       setSnapshots(data || []);
+      setTotalPages(Math.ceil((count ?? SNAPSHOTS_PER_PAGE) / SNAPSHOTS_PER_PAGE)); // Calculate total pages
       setLoading(false);
     };
 
@@ -44,7 +53,7 @@ export default function SnapshotList() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentPage]); // Re-fetch when currentPage changes
 
   if (loading) return <p className="text-sm text-gray-400">Loading snapshots…</p>;
 
@@ -52,9 +61,7 @@ export default function SnapshotList() {
 
   return (
     <div className="mt-8">
-      <h2 className="mb-2 text-lg font-semibold text-zinc-800 dark:text-white">
-        🧠 Training Snapshots
-      </h2>
+      <h2 className="mb-2 text-lg font-semibold">🧠 Training Snapshots</h2>
       <ul className="space-y-3">
         {snapshots.map((s) => (
           <li
@@ -97,6 +104,27 @@ export default function SnapshotList() {
           </li>
         ))}
       </ul>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex justify-between">
+        <button
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="rounded bg-gray-200 px-4 py-2 text-gray-700 disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span className="self-center text-sm text-gray-600">
+          Page {currentPage} of {totalPages}
+        </span>
+        <button
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="rounded bg-gray-200 px-4 py-2 text-gray-700 disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ export interface FineTuneEvent {
   message?: string;
   retry_count?: number;
   model_version?: string;
-  error_details?: string;
+  error?: string;
   retrain_suggested?: boolean;
 }
 

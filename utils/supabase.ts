@@ -39,7 +39,7 @@ export async function saveMessageToSupabase(
 
 export async function loadSessionMessages(sessionId: string): Promise<MessageWithEmotion[]> {
   const { data, error } = await supabase
-    .from("v_session_messages_with_emotions")
+    .from("v_emotion_training_data")
     .select("*")
     .eq("session_id", sessionId)
     .order("message_created_at", { ascending: true });

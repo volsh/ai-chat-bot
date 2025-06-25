@@ -24,6 +24,7 @@ export interface TeamMember {
   email?: string;
   joined_at?: string;
   user_id?: string;
+  role?: string;
 }
 
 export interface TeamMemberWithUsers extends TeamMember {

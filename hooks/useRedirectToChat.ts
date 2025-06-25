@@ -13,21 +13,28 @@ export default function useRedirectToChat() {
     }))
   );
   const redirectToChat = useCallback(async () => {
-    if (!session?.user?.id) return;
-    // Try to find the user's most recent session
-    const { data: sessions, error: fetchError } = await supabase
+    const userId = session?.user?.id;
+    if (!userId) {
+      console.warn("No user ID available. Skipping fetch for latest session.");
+      return null;
+    }
+
+    // Try to find the user's most recent session via treatments
+    const { data: latestSession, error: fetchError } = await supabase
       .from("sessions")
-      .select("id")
-      .eq("user_id", session?.user?.id || "")
+      .select("id, treatments!inner(user_id)") // Join treatments
+      .eq("treatments.user_id", userId) // Filter by user_id
       .order("created_at", { ascending: false })
-      .limit(1);
+      .limit(1)
+      .single();
+
     if (fetchError) {
       console.error("Session fetch error", fetchError);
       toast.error("Could not fetch sessions");
     }
 
-    if (sessions?.length) {
-      return router.replace(`/chat/${sessions[0].id}`);
+    if (latestSession) {
+      return router.replace(`/chat/${latestSession.id}`);
     }
 
     // Otherwise, create new

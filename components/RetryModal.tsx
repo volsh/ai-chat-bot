@@ -72,8 +72,8 @@ export default function RetryModal({
       <label className="mb-1 block text-sm font-medium text-zinc-700">Retry Reason</label>
       <Textarea
         placeholder="Optional reason for retry"
-        value={retryReason}
-        onChange={(e) => onChange(e.target.value)}
+        defaultValue={retryReason}
+        onBlur={(e) => onChange(e.target.value)}
         className="mb-4"
         disabled={autoRetry}
       />

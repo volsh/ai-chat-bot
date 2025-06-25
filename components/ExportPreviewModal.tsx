@@ -21,27 +21,27 @@ export default function ExportPreviewModal({
   cutoff,
   total,
 }: ExportPreviewModalProps) {
-  const [viewMode, setViewMode] = useState<"all" | "corrected" | "uncorrected">("all");
+  // const [viewMode, setViewMode] = useState<"all" | "corrected" | "uncorrected">("all");
 
-  const filteredEntries = useMemo(() => {
-    return entries.filter((e) =>
-      viewMode === "all"
-        ? true
-        : viewMode === "corrected"
-          ? !!e.annotation_updated_by
-          : !e.annotation_updated_by
-    );
-  }, [entries, viewMode]);
+  // const filteredEntries = useMemo(() => {
+  //   return entries.filter((e) =>
+  //     viewMode === "all"
+  //       ? true
+  //       : viewMode === "corrected"
+  //         ? !!e.annotation_updated_by
+  //         : !e.annotation_updated_by
+  //   );
+  // }, [entries, viewMode]);
 
   const groupedByEmotion = useMemo(() => {
     const map: Record<string, EmotionTrainingRow[]> = {};
-    filteredEntries.forEach((entry) => {
+    entries.forEach((entry) => {
       const key = entry.emotion || "Other";
       if (!map[key]) map[key] = [];
       map[key].push(entry);
     });
     return map;
-  }, [filteredEntries]);
+  }, [entries]);
 
   // const chartData = {
   //   labels: Object.keys(groupedByEmotion),
@@ -60,12 +60,12 @@ export default function ExportPreviewModal({
 
       {cutoff !== undefined && total !== undefined && (
         <div className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-          Showing <strong>{filteredEntries.length}</strong> out of {total} entries (cutoff:{" "}
+          Showing <strong>{entries.length}</strong> out of {total} entries (cutoff:{" "}
           <code>{cutoff.toFixed(2)}</code>)
         </div>
       )}
 
-      <div className="mb-3 flex gap-2 text-sm">
+      {/* <div className="mb-3 flex gap-2 text-sm">
         {["all", "corrected", "uncorrected"].map((mode) => (
           <button
             key={mode}
@@ -82,7 +82,7 @@ export default function ExportPreviewModal({
             {mode === "uncorrected" && "❗ Uncorrected Only"}
           </button>
         ))}
-      </div>
+      </div> */}
 
       <div className="max-h-[400px] space-y-4 overflow-y-auto text-sm">
         {Object.entries(groupedByEmotion).map(([emotion, group]) => (
@@ -117,7 +117,7 @@ export default function ExportPreviewModal({
           </details>
         ))}
       </div>
-      {filteredEntries.length === 0 && (
+      {entries.length === 0 && (
         <div className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
           No entries match the selected filters.
         </div>

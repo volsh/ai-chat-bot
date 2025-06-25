@@ -30,8 +30,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .eq("to_email", email)
     .eq("token", token)
     .eq("status", "pending")
+    .limit(1)
     .maybeSingle();
-
+  console.log("invite", invite);
   if (!invite) return res.status(403).json({ error: "Invalid or expired invite." });
 
   if (invite.status === "accepted") {
@@ -52,12 +53,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (error) {
     return res.status(500).json({ error: "Failed to join team" });
   }
+  console.log("team_id", team_id);
+  console.log("email", email);
 
-  await supabase
+  const existing = await supabase
     .from("invite_logs")
     .update({ status: "accepted", accepted_at: new Date().toISOString() })
     .eq("to_email", email)
-    .eq("team_id", team_id);
+    .eq("team_id", team_id)
+    .select("id,status")
+    // .limit(1)
+    // .maybeSingle();
+  console.log("existing", existing);
 
   return res.status(200).json({ success: true });
 }

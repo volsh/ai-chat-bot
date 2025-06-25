@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabaseBrowserClient as supabase } from "@/libs/supabase";
 import { useAppStore } from "@/state";
 import { useSavedFilters } from "@/hooks/useSavedFilters";
-import { FlaggedSession, MessageWithEmotion } from "@/types";
+import { ExportFilterOptions, FlaggedSession, MessageWithEmotion } from "@/types";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import MultiSelectFilter from "@/components/ui/multiSelectChips";
@@ -18,6 +18,7 @@ import Toggle from "@/components/ui/toggle";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
 import AnnotationModal from "@/components/therapist/AnnotationModal";
 import ClearFiltersButton from "@/components/ui/filters/ClearFiltersButton";
+import { differenceInMilliseconds } from "date-fns";
 
 export default function TherapistReviewPanel() {
   const { userProfile } = useAppStore(useShallow((s) => ({ userProfile: s.userProfile })));
@@ -32,18 +33,21 @@ export default function TherapistReviewPanel() {
   const [selectedMsg, setSelectedMsg] = useState<MessageWithEmotion | null>(null);
   const [showTopBtn, setShowTopBtn] = useState(false);
 
-  const { filters, setFilter, resetFilters } = useSavedFilters("therapist_filters", {
-    emotion: [] as string[],
-    intensity: [0.1, 1] as [number, number],
-    reason: [] as string[],
-    severity: [] as string[],
-    tone: [] as string[],
-    date: { from: "", to: "" },
-    highRiskOnly: false as boolean,
-    agreement: [0, 100] as [number, number],
-    flaggedOnly: false as boolean,
-    messageRole: [] as string[],
-  });
+  const { filters, setFilter, resetFilters } = useSavedFilters<ExportFilterOptions>(
+    "therapist_sessions_view_filters",
+    {
+      emotions: [] as string[],
+      intensity: [0.1, 1] as [number, number],
+      flagReasons: [] as string[],
+      tones: [] as string[],
+      startDate: "",
+      endDate: "",
+      highRiskOnly: false as boolean,
+      agreement: [0, 100] as [number, number],
+      flaggedOnly: false as boolean,
+      messageRole: [] as string[],
+    }
+  );
 
   useEffect(() => {
     const onScroll = () => setShowTopBtn(window.scrollY > 300);
@@ -84,24 +88,29 @@ export default function TherapistReviewPanel() {
           (tab === "unreviewed" && !s.reviewed)) &&
         (s.client_email.toLowerCase().includes(query.toLowerCase()) ||
           s.client_name.toLowerCase().includes(query.toLowerCase())) &&
-        (filters.reason.length === 0 ||
-          (s.top_reasons || []).some((r) => filters.reason.includes(r))) &&
-        (s.ai_agreement_rate ?? 0) >= filters.agreement[0] &&
-        (s.ai_agreement_rate ?? 0) <= filters.agreement[1] &&
+        (!filters.flagReasons?.length ||
+          (s.top_reasons || []).some((r) => filters.flagReasons?.includes(r))) &&
+        (!filters.agreement ||
+          ((s.ai_agreement_rate ?? 0) >= filters.agreement[0] &&
+            (s.ai_agreement_rate ?? 0) <= filters.agreement[1])) &&
         s.flagged_messages.some(
           (f) =>
             (!filters.flaggedOnly || f.flag_reason) &&
-            (f.intensity ?? 0) >= filters.intensity[0] &&
-            (f.intensity ?? 0) <= filters.intensity[1] &&
-            (!filters.emotion.length || (f.emotion && filters.emotion.includes(f.emotion))) &&
-            (filters.tone.length === 0 || (f.tone && filters.tone.includes(f.tone))) &&
-            (!filters.reason.length || (f.flag_reason && filters.reason.includes(f.flag_reason))) &&
-            (!filters.highRiskOnly || f.severity === "high") &&
-            ((!filters.date.from && !filters.date.to) ||
-              (f.annotation_updated_at &&
-                f.annotation_updated_at >= filters.date.from &&
-                f.annotation_updated_at <= filters.date.to)) &&
-            (!filters.messageRole.length || filters.messageRole.includes(f.message_role!))
+            (!filters.intensity ||
+              ((f.intensity ?? 0) >= filters.intensity[0] &&
+                (f.intensity ?? 0) <= filters.intensity[1])) &&
+            (!filters.emotions?.length || (f.emotion && filters.emotions.includes(f.emotion))) &&
+            (!filters.tones?.length || (f.tone && filters.tones.includes(f.tone))) &&
+            (!filters.flagReasons?.length ||
+              (f.flag_reason && filters.flagReasons.includes(f.flag_reason))) &&
+            (!filters.highRiskOnly ||
+              f.severity === "high" ||
+              (f.tone === "negative" && f.intensity && f.intensity >= 0.8)) &&
+            (!filters.startDate ||
+              (f.annotation_updated_at && f.annotation_updated_at >= filters.startDate)) &&
+            (!filters.endDate ||
+              (f.annotation_updated_at && f.annotation_updated_at <= filters.endDate)) &&
+            (!filters.messageRole?.length || filters.messageRole.includes(f.message_role!))
         )
       );
     })
@@ -112,7 +121,23 @@ export default function TherapistReviewPanel() {
         const maxB = Math.max(...b.flagged_messages.map((f) => f.intensity || 0));
         return maxB - maxA;
       }
-      return +new Date(b.session_created_at) - +new Date(a.session_created_at);
+      const messageA = a.flagged_messages.sort((msg1, msg2) =>
+        differenceInMilliseconds(
+          new Date(msg1.message_created_at),
+          new Date(msg2.message_created_at)
+        )
+      )[0];
+      const messageB = b.flagged_messages.sort((msg1, msg2) =>
+        differenceInMilliseconds(
+          new Date(msg1.message_created_at),
+          new Date(msg2.message_created_at)
+        )
+      )[0];
+
+      return differenceInMilliseconds(
+        new Date(messageA.message_created_at),
+        new Date(messageB.message_created_at)
+      );
     });
 
   const paginated = filtered.slice(0, page * 10);
@@ -159,7 +184,7 @@ export default function TherapistReviewPanel() {
   }
 
   return (
-    <div className="p-6 text-zinc-700 dark:text-white">
+    <div className="p-6">
       <Tabs
         active={tab}
         onChange={setTab}
@@ -180,14 +205,14 @@ export default function TherapistReviewPanel() {
           />
           <MultiSelectFilter
             label="Role"
-            values={filters.messageRole}
+            values={filters.messageRole || []}
             onChange={(v) => setFilter("messageRole", v)}
             options={["user", "assistant", "system"]}
           />
           <MultiSelectFilter
             label="Emotion"
-            values={filters.emotion}
-            onChange={(v) => setFilter("emotion", v)}
+            values={filters.emotions || []}
+            onChange={(v) => setFilter("emotions", v)}
             options={[
               ...new Set(
                 sessions.flatMap((s) => s.flagged_messages.flatMap((m) => m.emotion || []))
@@ -196,8 +221,8 @@ export default function TherapistReviewPanel() {
           />
           <MultiSelectFilter
             label="Tone"
-            values={filters.tone}
-            onChange={(v) => setFilter("tone", v)}
+            values={filters.tones || []}
+            onChange={(v) => setFilter("tones", v)}
             options={["positive", "neutral", "negative"]}
           />
           <Slider
@@ -206,7 +231,7 @@ export default function TherapistReviewPanel() {
             min={0.1}
             max={1}
             step={0.1}
-            value={[filters.intensity[0], filters.intensity[1]] as [number, number]}
+            value={[filters.intensity?.[0], filters.intensity?.[1]] as [number, number]}
             onChange={(v) => setFilter("intensity", v)}
           />
           <Slider
@@ -214,12 +239,12 @@ export default function TherapistReviewPanel() {
             label="Min Agreement %"
             min={0}
             max={100}
-            value={[filters.agreement[0], filters.agreement[1]] as [number, number]}
+            value={[filters.agreement?.[0], filters.agreement?.[1]] as [number, number]}
             onChange={(v) => setFilter("agreement", v)}
           />
           <Toggle
             label="Flagged Only"
-            checked={filters.flaggedOnly}
+            checked={filters.flaggedOnly || false}
             onChange={(v) => setFilter("flaggedOnly", v)}
           />
           <Toggle
@@ -234,16 +259,22 @@ export default function TherapistReviewPanel() {
                 </span>
               </span>
             }
-            checked={filters.highRiskOnly}
+            checked={filters.highRiskOnly || false}
             onChange={(v) => setFilter("highRiskOnly", v)}
           />
           <MultiSelectFilter
             label="Flag reason"
-            values={filters.reason}
-            onChange={(v) => setFilter("reason", v)}
+            values={filters.flagReasons || []}
+            onChange={(v) => setFilter("flagReasons", v)}
             options={[...new Set(sessions.flatMap((s) => s.top_reasons || []))]}
           />
-          <DateRangePicker value={filters.date} onChange={(v) => setFilter("date", v)} />
+          <DateRangePicker
+            value={{ from: filters.startDate!, to: filters.endDate! }}
+            onChange={(value) => {
+              setFilter("startDate", value.from);
+              setFilter("endDate", value.to);
+            }}
+          />
           <Select
             label="Sort"
             value={sort}
@@ -298,17 +329,20 @@ export default function TherapistReviewPanel() {
           filterFlags={(m) => {
             const shouldShow =
               (!filters.flaggedOnly || m.flag_reason) &&
-              (!filters.emotion.length || filters.emotion.includes(m.emotion ?? "")) &&
-              (!filters.tone.length || filters.tone.includes(m.tone ?? "")) &&
-              (m.intensity ?? 0) >= filters.intensity[0] &&
-              (m.intensity ?? 0) <= filters.intensity[1] &&
-              (!filters.reason.length || filters.reason.includes(m.flag_reason ?? "")) &&
-              (!filters.highRiskOnly || m.severity === "high") &&
-              ((filters.date.from === "" && filters.date.to === "") ||
-                (m.annotation_updated_at &&
-                  m.annotation_updated_at >= filters.date.from &&
-                  m.annotation_updated_at <= filters.date.to)) &&
-              (!filters.messageRole.length || filters.messageRole.includes(m.message_role!));
+              (!filters.emotions?.length || filters.emotions.includes(m.emotion ?? "")) &&
+              (!filters.tones?.length || filters.tones.includes(m.tone ?? "")) &&
+              (!filters.intensity ||
+                ((m.intensity ?? 0) >= filters.intensity[0] &&
+                  (m.intensity ?? 0) <= filters.intensity[1])) &&
+              (!filters.flagReasons?.length || filters.flagReasons.includes(m.flag_reason ?? "")) &&
+              (!filters.highRiskOnly ||
+                m.severity === "high" ||
+                (m.tone === "negative" && m.intensity && m.intensity >= 0.8)) &&
+              (!filters.startDate ||
+                (m.annotation_updated_at && m.annotation_updated_at >= filters.startDate)) &&
+              (!filters.endDate ||
+                (m.annotation_updated_at && m.annotation_updated_at <= filters.endDate)) &&
+              (!filters.messageRole?.length || filters.messageRole.includes(m.message_role!));
 
             return Boolean(shouldShow);
           }}

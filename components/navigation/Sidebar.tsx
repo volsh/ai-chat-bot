@@ -12,7 +12,7 @@ export default function Sidebar() {
         ? [{ label: "Dashboard", href: "/dashboard/therapist" }]
         : [
             { label: "Sessions", href: "/chat" },
-            { label: "Emotion Trends", href: "/dashboard/user/emotions" },
+            { label: "Emotion Trends", href: "/dashboard/user/analytics" },
           ];
   links.push({ label: "Me", href: "/auth/me" });
   return (

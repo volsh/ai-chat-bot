@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { createSupabaseServerClient } from "@/libs/supabase";
 import { exportTrainingData } from "@/utils/ai/exportTrainingData";
 import { v4 as uuidv4 } from "uuid";
+import pollFineTuneStatus from "@/utils/ai/pollFineTuneStatus";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -14,7 +15,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     auto_retry = false,
     retry_origin = "manual",
   } = req.body;
-  openai.fineTuning.jobs.create;
   const supabase = createSupabaseServerClient(req, res);
   const { data: userData } = await supabase.auth.getUser();
   const user = userData?.user;
@@ -55,8 +55,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(429).json({ error: "Retry limit reached (3)" });
     }
 
-    if (snapshot.job_status === "succeeded" || snapshot.archived) {
-      return res.status(400).json({ error: "Snapshot already completed or archived" });
+    if (snapshot.job_status === "succeeded") {
+      return res.status(400).json({ error: "Snapshot already completed" });
     }
 
     // ✅ Cooldown check (5 minutes)
@@ -94,10 +94,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .upload(fileName, csvString, { contentType: "text/csv", upsert: true });
     }
 
-    const webhookUrl = `${process.env.SUPABASE_FUNCTIONS_URL}/notify-fine-tune-status`;
-    const headCheck = await fetch(webhookUrl, { method: "HEAD" });
-    if (!headCheck.ok) throw new Error("Webhook URL unreachable");
-
     const openaiRes = await openai.files.create({
       file: new File([Buffer.from(csvString)], "retry-data.csv", {
         type: "text/csv;charset=utf-8",
@@ -108,46 +104,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const job = await openai.fineTuning.jobs.create({
       training_file: openaiRes.id,
       model: snapshot.model_version,
-      webhook_url: webhookUrl,
-    } as any);
+    });
 
-    const lockedUntil = new Date(now.getTime() + 5 * 60 * 1000); // 5 min
     // Lock it
     await supabase.from("fine_tune_locks").upsert({
       snapshot_id: snapshotId,
       user_id: user.id,
       expires_at: expiresAt,
+      locked_until: expiresAt,
       context: retry_origin || "manual",
-      locked_until: lockedUntil,
     });
 
-    // ✅ Log event (deduped)
-    await supabase.from("fine_tune_events").upsert(
-      [
-        {
-          snapshot_id: snapshotId,
-          user_id: user.id,
-          job_id: job.id,
-          status: "retrying",
-          retry_reason,
-          retry_count: Math.min((snapshot.retry_count || 0) + 1, 3),
-          auto_retry,
-          retry_origin,
-          model_version: snapshot.model_version,
-          filters: snapshot.filters,
-        },
-      ],
-      { onConflict: "snapshot_id,job_id" }
-    );
+    const version = new Date().toISOString().replace(/[:.]/g, "-");
 
     await supabase
       .from("fine_tune_snapshots")
       .update({
         retry_count: (snapshot.retry_count || 0) + 1,
-        openai_job_id: job.id,
-        file_path: snapshot.file_path,
+        version,
       })
       .eq("id", snapshotId);
+
+    // 🧠 Background poller to call edge function
+    pollFineTuneStatus(snapshotId, job.id, supabase);
 
     res.status(200).json({ success: true, jobId: job.id });
   } catch (err: any) {

@@ -1,4 +1,3 @@
-// pages/dashboard/therapist/events.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,41 +5,65 @@ import { supabaseBrowserClient as supabase } from "@/libs/supabase";
 import Card from "@/components/ui/card";
 import { FineTuneEvent } from "@/types";
 import clsx from "clsx";
+import toast from "react-hot-toast";
+
+const EVENTS_PER_PAGE = 10; // You can adjust this as needed
 
 export default function FineTuneEventLogPage() {
   const [events, setEvents] = useState<FineTuneEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchEvents = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("fine_tune_events")
         .select("*")
-        .order("created_at", { ascending: false });
-      if (error) return console.error(error);
-      setEvents(data);
+        .order("created_at", { ascending: false })
+        .range((currentPage - 1) * EVENTS_PER_PAGE, currentPage * EVENTS_PER_PAGE - 1);
+
+      // Apply status filter if it's not an empty string
+      if (status) {
+        query = query.eq("status", status);
+      }
+
+      const { data: eventData, error: fetchError } = await query;
+
+      if (fetchError) {
+        console.error(fetchError);
+        return;
+      }
+
+      const { count, error: countError } = await supabase
+        .from("fine_tune_events")
+        .select("id", { count: "exact" });
+
+      if (countError) {
+        console.error(countError);
+        return;
+      }
+
+      setEvents(eventData || []);
+      setTotalPages(Math.ceil((count ?? EVENTS_PER_PAGE) / EVENTS_PER_PAGE));
       setLoading(false);
     };
 
     fetchEvents();
-  }, []);
+  }, [currentPage, status]);
 
   return (
-    <div className="p-6">
-      <h1 className="mb-4 text-2xl font-bold">🧠 Fine-Tune Event Logs</h1>
+    <div className="mt-8">
+      <h2 className="mb-2 text-lg font-semibold">🔔 Fine-Tune Event Logs</h2>
       <div className="mb-4 flex gap-4">
-        <select
-          className="rounded border p-1 text-sm"
-          onChange={(e) => {
-            const val = e.target.value;
-            if (!val) return setEvents(events); // Reset filter
-            setEvents(events.filter((ev) => ev.status === val));
-          }}
-        >
+        <select className="rounded border p-1 text-sm" onChange={(e) => setStatus(e.target.value)}>
           <option value="">All Statuses</option>
-          <option value="success">Success</option>
+          <option value="succeeded">Success</option>
           <option value="failed">Failed</option>
-          <option value="retrying">Retrying</option>
+          <option value="running">Running</option>
+          <option value="validating_files">Validating Files</option>
+          {/* <option value="retrying">Retrying</option> */}
         </select>
       </div>
 
@@ -64,16 +87,17 @@ export default function FineTuneEventLogPage() {
                   {event.status}
                 </p>
                 <p>
-                  <p>
-                    <strong>Job:</strong>{" "}
-                    <span
-                      className="cursor-pointer text-blue-600 underline"
-                      title="Click to copy"
-                      onClick={() => navigator.clipboard.writeText(event.job_id)}
-                    >
-                      {event.job_id}
-                    </span>
-                  </p>
+                  <strong>Job:</strong>{" "}
+                  <span
+                    title="Click to copy"
+                    className="cursor-pointer hover:underline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(event.job_id);
+                      toast.success("Copied Job ID");
+                    }}
+                  >
+                    {event.job_id}
+                  </span>
                 </p>
                 <p>
                   <strong>User:</strong> {event.user_id}
@@ -83,9 +107,9 @@ export default function FineTuneEventLogPage() {
                     <strong>Model:</strong> {event.model_version}
                   </p>
                 )}
-                {event.error_details && (
+                {event.error && (
                   <p className="text-red-500">
-                    <strong>Error:</strong> {event.error_details}
+                    <strong>Error:</strong> {event.error}
                   </p>
                 )}
                 <p className="text-sm text-zinc-500">
@@ -96,6 +120,27 @@ export default function FineTuneEventLogPage() {
           ))}
         </div>
       )}
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex justify-between">
+        <button
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="rounded bg-gray-200 px-4 py-2 text-gray-700 disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span className="self-center text-sm text-gray-600">
+          Page {currentPage} of {totalPages}
+        </span>
+        <button
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="rounded bg-gray-200 px-4 py-2 text-gray-700 disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }

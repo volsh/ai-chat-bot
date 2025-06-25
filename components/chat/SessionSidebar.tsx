@@ -181,7 +181,7 @@ export default function SessionSidebar({
                             className={`group flex items-center justify-between gap-2 rounded px-2 py-1 text-sm transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
                               s.id === currentSessionId
                                 ? "bg-blue-200 text-white dark:bg-blue-700"
-                                : "text-zinc-800 dark:text-white"
+                                : ""
                             }`}
                           >
                             <div
@@ -244,7 +244,7 @@ export default function SessionSidebar({
   return (
     <div className="h-full w-64 overflow-y-auto border-r bg-zinc-50 p-4 dark:bg-zinc-900 sm:w-full">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-zinc-700 dark:text-white">📁 Sessions</h2>
+        <h2 className="text-sm font-bold">📁 Sessions</h2>
         <input
           type="text"
           placeholder="Search sessions..."
@@ -333,11 +333,6 @@ export default function SessionSidebar({
                             content={s.summary}
                             place="right"
                           />
-                          {s.archived && (
-                            <span className="ml-2 rounded bg-yellow-300 px-2 py-0.5 text-xs font-medium text-black dark:bg-yellow-500">
-                              Archived
-                            </span>
-                          )}
                         </div>
                         <button
                           data-tooltip-id="tooltip-session"

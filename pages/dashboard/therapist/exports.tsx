@@ -2,19 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Button from "@/components/ui/button";
-import MultiSelect from "@/components/ui/multiselect";
+import MultiSelectFilter, { OptionType } from "@/components/ui/multiSelectChips";
 import Slider from "@/components/ui/slider";
 import Toggle from "@/components/ui/toggle";
 import Input from "@/components/ui/input";
 import SnapshotList from "@/components/therapist/SnapshotList";
 import { emotions, tones, topics } from "@/utils/emotions/constants";
-import { ExportFilterOptions, EmotionSummary, EmotionTrainingRow } from "@/types";
-import { toast } from "react-hot-toast";
+import { ExportFilterOptions } from "@/types";
 import ExportPreviewModal from "@/components/ExportPreviewModal";
 import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from "chart.js";
 import SnapshotCreatorModal from "@/components/therapist/SnapshotCreatorModal";
 import ClearFiltersButton from "@/components/ui/filters/ClearFiltersButton";
+import { useExportTraining } from "@/hooks/useExportTraining";
+import { format } from "date-fns";
+import FineTuneEventLog from "./events";
+import RetryFailedJobs from "./retry-failed";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
@@ -28,72 +31,27 @@ export default function ExportTrainingScreen() {
     }
     return defaultFilters;
   });
-  const [totalAnnotations, setTotalAnnotations] = useState(0);
-  const [selectedCount, setSelectedCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [filePath, setFilePath] = useState<string | null>(null);
+
   const [showPreview, setShowPreview] = useState(false);
-  const [previewRows, setPreviewRows] = useState<EmotionTrainingRow[]>([]);
-  const [summary, setSummary] = useState<EmotionSummary[]>([]);
-  const [cutoff, setCutoff] = useState<number>(filters.scoreCutoff || 3);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const [exportLocked, setExportLocked] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showCreator, setShowCreator] = useState(false);
+  const [name, setName] = useState("Snapshot – " + format(new Date(), "PPpp"));
+
+  const {
+    fetchPreview,
+    loading,
+    filePath,
+    exportLocked,
+    previewRows,
+    cutoff,
+    totalCount,
+    totalAnnotations,
+    selectedCount,
+  } = useExportTraining(filters);
 
   useEffect(() => {
     localStorage.setItem("exportFilters", JSON.stringify(filters));
   }, [filters]);
-
-  const fetchPreview = async () => {
-    setLoading(true);
-    const res = await fetch("/api/exports/export-fine-tune-preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(filters),
-    });
-    const json = await res.json();
-    if (res.ok) {
-      setTotalAnnotations(json.total);
-      setSelectedCount(json.annotations.length);
-      setPreviewRows(json.annotations);
-      setSummary(json.summary);
-      setCutoff(filters.scoreCutoff || 3);
-      setTotalCount(json.total);
-    } else {
-      toast.error(json.error || "Failed to load preview");
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchPreview();
-  }, [filters]);
-
-  const handleExport = async () => {
-    setLoading(true);
-    setFilePath(null);
-    try {
-      const res = await fetch("/api/exports/export-fine-tune", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(filters),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Export failed");
-      if (json.locked) {
-        toast.error("Export temporarily locked. Please wait and try again.");
-        setExportLocked(true);
-        return;
-      }
-      setFilePath(json.filePath);
-      toast.success("Export successful");
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="p-6">
@@ -106,29 +64,29 @@ export default function ExportTrainingScreen() {
 
       {showAdvanced && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MultiSelect
+          <MultiSelectFilter
             label="Emotion"
-            options={emotions.map((e) => ({ label: e, value: e }))}
-            value={(filters.emotions || []).map((e) => ({ label: e, value: e }))}
-            onChange={(selected) =>
-              setFilters((f) => ({ ...f, emotions: selected.map((o) => o.value) }))
-            }
+            options={[...new Set(previewRows.flatMap((s) => s.emotion || []))].map((e) => ({
+              label: e,
+              value: e,
+            }))}
+            values={filters.emotions || []}
+            onChange={(selected) => setFilters((f) => ({ ...f, emotions: selected }))}
           />
-          <MultiSelect
+          <MultiSelectFilter
             label="Tone"
-            options={tones.map((t) => ({ label: t, value: t }))}
-            value={(filters.tones || []).map((t) => ({ label: t, value: t }))}
-            onChange={(selected) =>
-              setFilters((f) => ({ ...f, tones: selected.map((o) => o.value) }))
-            }
+            options={[...new Set(previewRows.flatMap((s) => s.tone || []))].map((e) => ({
+              label: e,
+              value: e,
+            }))}
+            values={filters.tones || []}
+            onChange={(selected) => setFilters((f) => ({ ...f, tones: selected }))}
           />
-          <MultiSelect
+          <MultiSelectFilter
             label="Topic"
-            options={topics.map((t) => ({ label: t, value: t }))}
-            value={(filters.topics || []).map((t) => ({ label: t, value: t }))}
-            onChange={(selected) =>
-              setFilters((f) => ({ ...f, topics: selected.map((o) => o.value) }))
-            }
+            options={[...new Set(previewRows.flatMap((s) => s.topic || []))]}
+            values={filters.topics || []}
+            onChange={(selected) => setFilters((f) => ({ ...f, topics: selected }))}
           />
           <Slider
             type="range"
@@ -141,23 +99,37 @@ export default function ExportTrainingScreen() {
               setFilters((f) => ({ ...f, intensity: [value[0], value[1]] }))
             }
           />
-          <MultiSelect
+          <MultiSelectFilter
             label="Role"
-            options={["user", "assistant"].map((r) => ({ label: r, value: r }))}
-            value={(filters.role || []).map((r) => ({ label: r, value: r }))}
-            onChange={(selected) =>
-              setFilters((f) => ({ ...f, role: selected.map((o) => o.value) }))
-            }
+            options={["user", "assistant"]}
+            values={filters.messageRole || []}
+            onChange={(selected) => setFilters((f) => ({ ...f, messageRole: selected }))}
           />
-          <Input
-            label="User ID"
-            value={filters.userId || ""}
-            onChange={(e) => setFilters((f) => ({ ...f, userId: e.target.value }))}
+          <MultiSelectFilter
+            label="User"
+            values={filters.users || []}
+            onChange={(selected) => setFilters((f) => ({ ...f, users: selected }))}
+            options={Array.from(
+              new Map(
+                previewRows.map((s) => [
+                  s.user_id,
+                  { value: s.user_id, label: s.full_name } as OptionType,
+                ])
+              ).values()
+            )}
           />
-          <Input
-            label="Therapist ID"
-            value={filters.therapistId || ""}
-            onChange={(e) => setFilters((f) => ({ ...f, therapistId: e.target.value }))}
+          <MultiSelectFilter
+            label="Therapist"
+            values={filters.therapists || []}
+            onChange={(selected) => setFilters((f) => ({ ...f, therapists: selected }))}
+            options={Array.from(
+              new Map(
+                previewRows.map((s) => [
+                  s.annotation_updated_by,
+                  { value: s.user_id, label: s.therapist_name } as OptionType,
+                ])
+              ).values()
+            )}
           />
           <div className="flex gap-5">
             <Toggle
@@ -213,7 +185,7 @@ export default function ExportTrainingScreen() {
         </div>
       )}
       <div className="mt-5 flex justify-between">
-        <div className="badge text-zinc-700 dark:text-white">
+        <div className="badge">
           Selected {selectedCount} out of {totalAnnotations}
         </div>
         {showAdvanced && <ClearFiltersButton onClick={() => setFilters(defaultFilters)} />}
@@ -228,7 +200,7 @@ export default function ExportTrainingScreen() {
         <Button onClick={() => setShowPreview(true)} variant="secondary">
           👁️ Preview Selection
         </Button>
-        <Button onClick={handleExport} loading={loading || exportLocked}>
+        <Button onClick={() => setShowCreator(true)} loading={loading || exportLocked}>
           ⬆️ Upload to OpenAI
         </Button>
         {filePath && (
@@ -245,12 +217,12 @@ export default function ExportTrainingScreen() {
       </div>
 
       <div className="mt-8">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-700 dark:text-white">🧐 Snapshots</h2>
+        {/* <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">🧐 Snapshots</h2>
           <Button size="sm" onClick={() => setShowCreator(true)}>
             ➕ Create Snapshot
           </Button>
-        </div>
+        </div> */}
         <SnapshotList />
       </div>
       {showCreator && (
@@ -258,6 +230,8 @@ export default function ExportTrainingScreen() {
           filters={filters}
           onClose={() => setShowCreator(false)}
           onSuccess={fetchPreview}
+          snapshotName={name}
+          setSnpashotName={setName}
         />
       )}
 
@@ -270,7 +244,9 @@ export default function ExportTrainingScreen() {
         />
       )}
 
-      {summary.length > 0 && (
+      <FineTuneEventLog />
+      <RetryFailedJobs />
+      {/* {summary.length > 0 && (
         <div className="mt-6 max-w-xl">
           <h3 className="mb-2 font-semibold">📊 Score by Emotion</h3>
           <Bar
@@ -291,7 +267,7 @@ export default function ExportTrainingScreen() {
             }}
           />
         </div>
-      )}
+      )} */}
     </div>
   );
 }

@@ -1,79 +1,137 @@
 import { serve } from "https://deno.land/std/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
-
+import { differenceInDays } from "https://esm.sh/date-fns@3.6.0";
 serve(async (req) => {
   const { to_email, from_name, session_title, link, inviter_id, team_id } = await req.json();
   const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    Deno.env.get("SUPABASE_URL"),
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
   );
-
-  const existing = await supabase
+  // Rate limit: 10 per hour
+  const inviterCount = await supabase
     .from("invite_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("to_email", to_email)
-    .eq("team_id", team_id);
-  if ((existing.count ?? 0) > 0) {
-    return new Response(JSON.stringify({ error: "Already invited" }), { status: 409 });
-  }
-
-  const ip = req.headers.get("x-forwarded-for") || "unknown";
-
-  // Rate limit: 5 per hour
-  const { count } = await supabase
-    .from("invite_logs")
-    .select("*", { count: "exact", head: true })
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
     .eq("inviter_id", inviter_id)
     .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
-
-  if ((count ?? 0) >= 10) {
-    return new Response(JSON.stringify({ error: "Too many invites. Please try later." }), {
-      status: 429,
-    });
+  if ((inviterCount.count ?? 0) >= 10) {
+    return new Response(
+      JSON.stringify({
+        error: "Too many invites. Please try later.",
+      }),
+      {
+        status: 429,
+      }
+    );
   }
-
-  const existing = await supabase
+  const expiryCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: existing } = await supabase
     .from("invite_logs")
-    .select("*")
-    .eq("to_email", email)
-    .eq("team_id", team_id)
-    .order("created_at", { ascending: false })
+    .select("id, status, created_at, retry_count, token")
+    .eq("inviter_id", inviter_id)
+    .or(`to_email.eq.${to_email},team_id.eq.${team_id}`)
     .limit(1)
     .maybeSingle();
-
-  if (existing && (existing.retry_count || 0) >= 3) {
-    return res.status(429).json({ success: false, error: "Invite retry limit reached" });
+  console.log("existing", existing);
+  let token;
+  if (existing) {
+    if (existing.status === "accepted") {
+      console.log("Already accepted");
+      return new Response(
+        JSON.stringify({
+          error: "Already accepted",
+        }),
+        {
+          status: 409,
+        }
+      );
+    }
+    const isExpired = differenceInDays(new Date(Date.now()), new Date(existing.created_at)) >= 7;
+    if (existing.status === "pending" && !isExpired) {
+      console.log("Already invited");
+      return new Response(
+        JSON.stringify({
+          error: "Already invited",
+        }),
+        {
+          status: 409,
+        }
+      );
+    }
+    if (isExpired && existing.retry_count >= 3) {
+      return new Response(
+        JSON.stringify({
+          error: "Invite retry limit reached",
+        }),
+        {
+          status: 409,
+        }
+      );
+    }
+    await supabase
+      .from("invite_logs")
+      .update({
+        retry_count: (existing.retry_count || 0) + 1,
+      })
+      .eq("id", existing.id);
+    token = existing.token;
+  } else {
+    const ip = req.headers.get("x-forwarded-for") || "unknown";
+    const { data: inserted, error: insertError } = await supabase
+      .from("invite_logs")
+      .insert({
+        inviter_id,
+        to_email,
+        ip_address: ip,
+        team_id,
+        retry_count: 0,
+      })
+      .select("token")
+      .limit(1)
+      .maybeSingle();
+    console.log("inserted", inserted);
+    console.log("insertError", insertError);
+    if (insertError) {
+      console.error("Invite log insert failed", insertError);
+      return new Response(
+        JSON.stringify({
+          error: "Failed to create invite",
+        }),
+        {
+          status: 500,
+        }
+      );
+    }
+    token = inserted?.token;
   }
-
-  await supabase
-    .from("invite_logs")
-    .update({ retry_count: (existing.retry_count || 0) + 1, created_at: new Date().toISOString() })
-    .eq("id", existing.id);
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("invite_logs")
-    .insert({ inviter_id, to_email, ip_address: ip, team_id })
-    .select("token");
-
-  if (insertError) {
-    console.error("Invite log insert failed", insertError);
-    return new Response(JSON.stringify({ error: "Failed to create invite" }), { status: 500 });
-  }
-
-  const token = inserted?.token;
-
   if (!token) {
-    return new Response(JSON.stringify({ error: "Failed to generate invite token" }), {
-      status: 500,
-    });
+    return new Response(
+      JSON.stringify({
+        error: "Failed to generate invite token",
+      }),
+      {
+        status: 500,
+      }
+    );
   }
-
   const inviteLink = `${link}&token=${token}`;
-
-  const { error } = await supabase.functions.invoke("sendgrid", {
+  const { error } = await supabase.functions.invoke("send-grid", {
     body: {
-      personalizations: [{ to: [{ email: to_email }] }],
-      from: { email: "no-reply@yourapp.com", name: from_name },
+      personalizations: [
+        {
+          to: [
+            {
+              email: to_email,
+            },
+          ],
+        },
+      ],
+      from: {
+        email: "liorvolsh@gmail.com",
+        name: from_name,
+      },
       subject: `${from_name} invited you to collaborate`,
       content: [
         {
@@ -83,11 +141,23 @@ serve(async (req) => {
       ],
     },
   });
-
   if (error) {
     console.error("Email send failed", error);
-    return new Response(JSON.stringify({ error: "Email delivery failed" }), { status: 500 });
+    return new Response(
+      JSON.stringify({
+        error: "Email delivery failed",
+      }),
+      {
+        status: 500,
+      }
+    );
   }
-
-  return new Response(JSON.stringify({ success: true }), { status: 200 });
+  return new Response(
+    JSON.stringify({
+      success: true,
+    }),
+    {
+      status: 200,
+    }
+  );
 });

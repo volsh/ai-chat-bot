@@ -8,6 +8,17 @@ import RetryFailedJobs from "./retry-failed";
 import { useState } from "react";
 import clsx from "clsx";
 import { Eye, RotateCcw, Users } from "lucide-react";
+import { GetServerSidePropsContext } from "next";
+import ssrGuard from "@/utils/auth/ssrGuard";
+import AnalyticsSection from "@/components/analytics/TharpistAnalyticsSection";
+
+export async function getServerSideProps(context: GetServerSidePropsContext) {
+  const redirect = await ssrGuard(context, ["therapist"]);
+  if (redirect) {
+    return redirect;
+  }
+  return { props: {} };
+}
 
 export default function TherapistDashboardPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -22,7 +33,7 @@ export default function TherapistDashboardPage() {
 
   return (
     <div className="p-6">
-      <h1 className="mb-4 text-2xl font-bold text-zinc-800 dark:text-white">Therapist Dashboard</h1>
+      <h1 className="mb-4 text-2xl font-bold">Therapist Dashboard</h1>
       <section
         id="team"
         className={clsx(
@@ -100,43 +111,24 @@ export default function TherapistDashboardPage() {
         {expanded === "exports" && <ExportCsvView />}
       </section>
 
+      {/* Analytics Section */}
       <section
-        id="events"
+        id="analytics"
         className={clsx(
           "mb-6 transition-all duration-300",
-          expanded === "events" ? "max-h-none" : "max-h-12 overflow-hidden"
+          expanded === "analytics" ? "max-h-none" : "max-h-12 overflow-hidden"
         )}
       >
         <h2
           className="cursor-pointer text-lg font-semibold text-blue-600 hover:underline"
           onClick={() => {
-            toggle("events");
-            scrollTo("events");
+            toggle("analytics");
+            scrollTo("analytics");
           }}
         >
-          🔔 Fine-Tune Events
+          📊 Analytics
         </h2>
-        {expanded === "events" && <FineTuneEventLog />}
-      </section>
-
-      <section
-        id="retry"
-        className={clsx(
-          "mb-6 transition-all duration-300",
-          expanded === "retry" ? "max-h-none" : "max-h-12 overflow-hidden"
-        )}
-      >
-        <h2
-          className="cursor-pointer text-lg font-semibold text-blue-600 hover:underline"
-          onClick={() => {
-            toggle("retry");
-            scrollTo("retry");
-          }}
-        >
-          <RotateCcw size={16} className="ml-1 mr-2 inline-block" />
-          <span>Retry Failed Jobs</span>
-        </h2>
-        {expanded === "retry" && <RetryFailedJobs />}
+        {expanded === "analytics" && <AnalyticsSection />}
       </section>
     </div>
   );

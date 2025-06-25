@@ -10,7 +10,6 @@ export type Database = {
           file_path: string;
           filters: Record<string, any>; // entire filter state stored here
           model_version: string;
-          openai_job_id?: string;
           job_status?: string;
           version?: string;
         };
@@ -22,7 +21,6 @@ export type Database = {
           file_path: string;
           filters: Record<string, any>;
           model_version: string;
-          openai_job_id?: string;
           job_status?: string;
           version?: string;
         };

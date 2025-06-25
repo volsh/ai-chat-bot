@@ -5,4 +5,5 @@ export interface UserProfile {
   role: "user" | "therapist" | "admin";
   created_at: string;
   avatar_url?: string;
+  short_description?: string;
 }

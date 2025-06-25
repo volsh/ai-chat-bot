@@ -66,7 +66,7 @@ export default function ClientListPage() {
                 {client.email[0]?.toUpperCase()}
               </div>
               <div>
-                <div className="font-medium text-zinc-700 dark:text-white">{client.email}</div>
+                <div className="font-medium ">{client.email}</div>
                 <div className="text-sm text-zinc-500">
                   Sessions: {client.session_count} — Last:{" "}
                   {client.last_active ? new Date(client.last_active).toLocaleString() : "N/A"}

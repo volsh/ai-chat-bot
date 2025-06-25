@@ -55,7 +55,7 @@ export default function SessionsPage() {
             key={session.id}
             className="group relative rounded-lg border p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
           >
-            <h2 className="mb-1 text-lg font-semibold text-zinc-800 dark:text-white">
+            <h2 className="mb-1 text-lg font-semibold ">
               {session.title}
             </h2>
             <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">

@@ -10,7 +10,7 @@ export default function RetryCountFilter({ value, onChange }: Props) {
   const [sliderValue, setSliderValue] = useState(value);
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-2">
       <label htmlFor="retry-count" className="text-sm font-medium">
         Retry Count ≥ {sliderValue}
       </label>

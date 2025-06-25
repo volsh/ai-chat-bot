@@ -50,8 +50,8 @@ export default function SessionCard({
         <button onClick={onToggle}>
           {selected ? <CheckSquare className="text-blue-600" size={18} /> : <Square size={18} />}
         </button>
-        <div className="text-lg font-semibold text-zinc-800 dark:text-white">
-          {session_title || "Untitled session"}
+        <div className="text-lg font-semibold ">
+          <a href={`/chat/${session.session_id}`}>{session_title || "Untitled session"}</a>
         </div>
       </div>
       <div className="text-xs text-zinc-500">Client: {client_email}</div>

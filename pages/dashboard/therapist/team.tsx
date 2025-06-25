@@ -1,6 +1,6 @@
 import { supabaseBrowserClient as supabase } from "@/libs/supabase";
 import Button from "@/components/ui/button";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InviteLog, Team, TeamMemberWithUsers } from "@/types";
 import toast from "react-hot-toast";
 import { Trash2 } from "lucide-react";
@@ -16,8 +16,9 @@ import { debounce } from "lodash-es";
 import { useAppStore } from "@/state";
 import SearchUsers, { UserOption } from "@/components/SearchUsers";
 import validator from "validator";
+import { useInviteUsage } from "@/hooks/useInviteUsage";
+import TeamMembersList from "@/components/therapist/TeamMembersList";
 
-const DAILY_INVITE_LIMIT = 10;
 const MAX_RETRY_COUNT = 3;
 
 const InviteStatus = ["all", "pending", "accepted", "expired"] as const;
@@ -26,6 +27,13 @@ type InviteStatusType = (typeof InviteStatus)[number];
 const getInviteExpiry = (createdAt: string) => {
   const created = new Date(createdAt);
   return new Date(created.getTime() + 7 * 86400 * 1000);
+};
+
+const isExpiringSoon = (createdAt: string) => {
+  const expires = getInviteExpiry(createdAt);
+  const now = new Date();
+  const diffMs = expires.getTime() - now.getTime();
+  return diffMs > 0 && diffMs < 24 * 60 * 60 * 1000; // less than 1 day left
 };
 
 const getTooltip = (log: InviteLog) => {
@@ -43,54 +51,23 @@ export default function TherapistTeam() {
   const [team, setTeam] = useState<Team | null>(null);
   const [loadingTeam, setLoadingTeam] = useState(true);
   const [members, setMembers] = useState<TeamMemberWithUsers[]>([]);
-  const [loading, setLoading] = useState(false);
   const [loadingMoreInvites, setLoadingMoreInvites] = useState(false);
   const [hasMoreInvites, setHasMoreInvites] = useState(true);
   const [inviteLogs, setInviteLogs] = useState<InviteLog[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserOption | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; name: string } | null>(null);
   const [resending, setResending] = useState<string | null>(null);
-  const [inviteUsage, setInviteUsage] = useState({ used: 0, limit: DAILY_INVITE_LIMIT });
   const [retryThreshold, setRetryThreshold] = useState(0);
   const [logFilter, setLogFilter] = useState<InviteStatusType>("all");
+  const [loadingInvites, setLoadingInvites] = useState(false);
+  const pageRef = useRef(0);
 
   const teamId = team?.id;
 
-  const fetchInviteLogs = useCallback(async () => {
-    if (!teamId) return;
-    let query = supabase
-      .from("invite_logs")
-      .select("id, to_email, created_at, status, retry_count")
-      .eq("team_id", teamId);
-    if (logFilter === "expired") {
-      query = query.lt("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-    } else if (logFilter !== "all") {
-      query = query.eq("status", logFilter);
-    }
-    query = query.gte("retry_count", retryThreshold);
-    query.order("created_at", { ascending: false }).limit(DAILY_INVITE_LIMIT);
-    const { data, error } = await query;
-    if (error) {
-      toast.error(`Failed to fetch invite logs ${error.message}`);
-      return null;
-    } else {
-      setInviteLogs(data || []);
-      return data || [];
-    }
-  }, [teamId, logFilter, retryThreshold]);
-
-  const debouncedFetchInviteLogs = useMemo(
-    () => debounce(fetchInviteLogs, 500, { leading: true }),
-    [fetchInviteLogs]
-  );
-
-  useEffect(() => {
-    debouncedFetchInviteLogs();
-    return () => debouncedFetchInviteLogs.cancel(); // cleanup on filter change
-  }, [debouncedFetchInviteLogs]);
-
   const userProfile = useAppStore((s) => s.userProfile);
   const userId = userProfile?.id;
+
+  const inviteUsage = useInviteUsage(team?.id);
 
   useEffect(() => {
     const loadTeam = async () => {
@@ -99,7 +76,7 @@ export default function TherapistTeam() {
 
       const { data: member, error } = await supabase
         .from("team_members")
-        .select("*")
+        .select("team_id")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -115,7 +92,7 @@ export default function TherapistTeam() {
           .maybeSingle();
 
         if (error) {
-          toast.error("Failed to load teams");
+          toast.error("Failed to load team information");
         }
 
         if (team) {
@@ -124,8 +101,22 @@ export default function TherapistTeam() {
 
         const { data: members } = await supabase
           .from("team_members")
-          .select()
+          .select("*, users(id, full_name, email, role, avatar_url, short_description)")
           .eq("team_id", team.id);
+
+        const roleOrder = ["admin", "manager", "member"];
+
+        if (members) {
+          members.sort((a, b) => {
+            const roleIndexA = roleOrder.indexOf(a.role);
+            const roleIndexB = roleOrder.indexOf(b.role);
+
+            if (roleIndexA === -1) return 1;
+            if (roleIndexB === -1) return -1;
+
+            return roleIndexA - roleIndexB;
+          });
+        }
         setMembers(members || []);
       }
       setLoadingTeam(false);
@@ -133,70 +124,104 @@ export default function TherapistTeam() {
     loadTeam();
   }, [userId]);
 
+  const loadInviteLogs = useCallback(
+    async ({ reset = false }: { reset?: boolean } = {}) => {
+      if (!userId) return;
+      if (reset) {
+        pageRef.current = 0;
+        setInviteLogs([]);
+        setHasMoreInvites(true);
+      }
+      const page = pageRef.current;
+      const PAGE_SIZE = 10;
+      setLoadingInvites(true);
+      let query = supabase
+        .from("invite_logs")
+        .select("id, to_email, created_at, status, retry_count, accepted_at")
+        .eq("inviter_id", userId)
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (logFilter === "expired") {
+        query = query.lt("created_at", new Date(Date.now() - 7 * 86400 * 1000).toISOString());
+      } else if (logFilter !== "all") {
+        query = query.eq("status", logFilter);
+      }
+      query = query.gte("retry_count", retryThreshold);
+
+      const { data, error } = await query;
+      setLoadingInvites(false);
+      if (error) {
+        toast.error(`Failed to fetch invites: ${error.message}`);
+        return;
+      }
+      if (data.length < PAGE_SIZE) setHasMoreInvites(false);
+      if (!reset) pageRef.current++;
+      setInviteLogs((prev) => (reset ? data : [...prev, ...data]));
+    },
+    [userId, logFilter, retryThreshold]
+  );
+
+  const debouncedLoadInvites = useMemo(
+    () => debounce(() => loadInviteLogs({ reset: true }), 300),
+    [loadInviteLogs]
+  );
+
   useEffect(() => {
-    if (!teamId) return;
-    supabase
-      .from("invite_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("team_id", teamId)
-      .eq("status", "pending")
-      .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-      .then(({ count }) => setInviteUsage({ used: count || 0, limit: DAILY_INVITE_LIMIT }));
-  }, [teamId, inviteLogs.length]);
+    debouncedLoadInvites();
+    return () => debouncedLoadInvites.cancel();
+  }, [debouncedLoadInvites]);
 
   const sendInvite = async (email: string) => {
-    if (!teamId || !email) return;
-    if (!validator.isEmail(email)) {
-      toast.error("Invalid email");
-      return;
-    }
+    if (!team?.id || !email) return;
+    if (!validator.isEmail(email)) return toast.error("Invalid email");
     if (
       inviteLogs.some(
         (invite) =>
           invite.to_email.toLowerCase().trim() === email.toLowerCase().trim() &&
           invite.status === "pending"
       )
-    ) {
-      toast.error("An invite for this user is already pending.");
-      return;
-    }
-    setLoading(true);
+    )
+      return toast.error("An invite for this user is already pending.");
+
     try {
       const res = await fetch("/api/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, team_id: teamId }),
+        body: JSON.stringify({ email, team_id: team.id }),
       });
       const result = await res.json();
       if (result.success) {
         toast.success("Invite sent successfully");
-        await fetchInviteLogs();
+        loadInviteLogs({ reset: true });
       } else {
         toast.error(result.error || "Failed to send invite");
       }
     } catch (err) {
       toast.error("Failed to send invite");
     }
-    setLoading(false);
-    setSelectedUser(null);
+    // setSelectedUser(null);
   };
 
   const resendInvite = async (log: InviteLog) => {
-    if (!teamId || !log.to_email) return;
+    if (!team?.id || !log.to_email) return;
     setResending(log.id);
-    const res = await fetch("/api/invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: log.to_email, team_id: teamId }),
-    });
-    const result = await res.json();
-    if (result.success) {
-      toast.success("Invite resent.");
-      await fetchInviteLogs();
-    } else {
-      toast.error(result.error || "Failed to resend invite.");
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: log.to_email, team_id: team.id }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        toast.success("Invite resent.");
+        loadInviteLogs({ reset: true });
+      } else {
+        toast.error(result.error || "Failed to resend invite.");
+      }
+    } finally {
+      setResending(null);
     }
-    setResending(null);
   };
 
   const confirmAndRemoveTeamMember = async () => {
@@ -269,7 +294,7 @@ export default function TherapistTeam() {
                 disabled={limitReached}
               />
               <Button
-                disabled={loading || !selectedUser || limitReached}
+                disabled={loadingInvites || !selectedUser || limitReached}
                 onClick={() => {
                   sendInvite(selectedUser?.label!);
                 }}
@@ -290,38 +315,13 @@ export default function TherapistTeam() {
             {members.length === 0 && (
               <p className="text-sm text-zinc-500">No team members found.</p>
             )}
-            <ul className="space-y-2">
-              {members.map((m) => (
-                <li key={m.users.id} className="flex items-center justify-between border-b pb-2">
-                  <div>
-                    <div className="font-medium">{m.users.full_name || m.users.email}</div>
-                    <Badge>{m.users.role}</Badge>
-                    <button
-                      onClick={() => {
-                        if (m.user_id === userId) {
-                          alert("You cannot remove yourself from the team.");
-                          return;
-                        }
-                        setConfirmRemove({
-                          userId: m.user_id!,
-                          name: m.users.full_name || m.users.email,
-                        });
-                      }}
-                      className="text-red-500 hover:underline"
-                      aria-label="Remove team member"
-                      title="Remove team member"
-                    >
-                      <Trash2 size={14} className="mr-1 inline" /> Remove
-                    </button>
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    Joined: {m.joined_at ? new Date(m.joined_at).toLocaleDateString() : "—"}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <TeamMembersList
+              members={members}
+              setConfirmRemove={setConfirmRemove}
+              userId={userId!}
+            />
             <h3 className="mt-4 text-sm font-semibold">Recent Invites:</h3>
-            <div className="mt-2 flex gap-2 text-xs">
+            <div className="my-2 flex gap-2 text-xs">
               {InviteStatus.map((status) => (
                 <button
                   key={status}
@@ -335,14 +335,19 @@ export default function TherapistTeam() {
                   {status.charAt(0).toUpperCase() + status.slice(1)}
                 </button>
               ))}
-              <RetryCountFilter value={retryThreshold} onChange={setRetryThreshold} />
+              <div className="ml-2">
+                {" "}
+                <RetryCountFilter value={retryThreshold} onChange={setRetryThreshold} />
+              </div>
             </div>
             <ul className="text-xs text-zinc-600 dark:text-zinc-400">
               {inviteLogs.map((log) => {
-                const created = new Date(log.created_at);
-                const expires = getInviteExpiry(log.created_at);
-                const isExpired = expires < new Date();
                 const isAccepted = log.status === "accepted";
+                const created = new Date(log.created_at);
+                const accepted = new Date(log.accepted_at);
+                const expires = getInviteExpiry(log.created_at);
+                const isExpired = expires < new Date() && !isAccepted;
+                const expiringSoon = isExpiringSoon(log.created_at);
 
                 return (
                   <li key={log.id} className="flex items-center justify-between border-b pb-1">
@@ -350,18 +355,28 @@ export default function TherapistTeam() {
                       <div>
                         <strong>{log.to_email}</strong>{" "}
                         {isAccepted && <CheckCircle className="inline text-green-500" size={12} />}
-                        {isExpired && !isAccepted && (
-                          <span className="ml-1 text-red-500">(expired)</span>
+                        {isExpired && <span className="ml-1 text-red-500">(expired)</span>}
+                        {expiringSoon && (
+                          <span className="ml-2 font-medium text-orange-500">
+                            (expiring soon ⏳)
+                          </span>
                         )}
-                        {log.status === "pending" && !isExpired && (
+                        {log.status === "pending" && !isExpired && !expiringSoon && (
                           <Clock className="inline text-yellow-500" size={12} />
                         )}
                       </div>
                       <div className="text-[10px]">
-                        Sent: {created.toLocaleString()} | Expires: {expires.toLocaleDateString()}
+                        Sent: {created.toLocaleString()} |{" "}
+                        <>
+                          {isAccepted ? (
+                            <span>Accepted: {accepted.toLocaleDateString()} </span>
+                          ) : (
+                            <>Expires: {expires.toLocaleDateString()}</>
+                          )}
+                        </>
                       </div>
                     </div>
-                    {!isAccepted && (
+                    {isExpired && (
                       <button
                         className="flex items-center gap-1 px-3 py-1.5 text-xs text-blue-500 disabled:opacity-50"
                         onClick={() => resendInvite(log)}
@@ -400,8 +415,10 @@ export default function TherapistTeam() {
                 </Button>
               </div>
             )}
-            {!inviteLogs.length && !loading && (
-              <p className="text-sm text-gray-500">No pending invites.</p>
+            {!inviteLogs.length && !loadingInvites && (
+              <p className="text-sm text-gray-500">
+                No {logFilter === "all" ? "" : logFilter} invites
+              </p>
             )}
           </div>
           {confirmRemove && (

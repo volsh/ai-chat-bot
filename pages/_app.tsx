@@ -48,7 +48,9 @@ function MyApp({ Component, pageProps }: AppProps) {
               <LogoutButton />
             </div>
           </header>
-          <main className={`p-4 transition-opacity duration-300 ${fadeClass}`}>
+          <main
+            className={`p-4 transition-opacity duration-300 ${fadeClass} bg-white text-zinc-700 dark:bg-zinc-900 dark:text-white`}
+          >
             {!hideBreadcrumb && <Breadcrumb />}
             <Component {...pageProps} />
           </main>

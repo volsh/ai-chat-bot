@@ -4,7 +4,6 @@ export interface Session {
   title: string;
   created_at: string;
   ended_at: string;
-  archived: boolean;
   goal: string;
   emoji: string;
   color: string;

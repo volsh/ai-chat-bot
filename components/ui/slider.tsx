@@ -2,8 +2,9 @@
 
 import * as RadixSlider from "@radix-ui/react-slider";
 import Label from "./label";
-import React, { ReactNode } from "react";
+import React, { ReactNode, useMemo, useState } from "react";
 import { Tooltip } from "react-tooltip";
+import { debounce } from "lodash-es";
 
 interface BaseProps {
   label: string;
@@ -13,6 +14,7 @@ interface BaseProps {
   id?: string;
   tooltip?: string | ReactNode;
   tooltipId?: string;
+  useDebounce?: boolean;
 }
 
 interface SingleSliderProps {
@@ -30,29 +32,49 @@ interface RangeSliderProps {
 type SliderProps = BaseProps & (SingleSliderProps | RangeSliderProps);
 
 export default function Slider({
+  value,
   label,
+  onChange,
+  type,
   min,
   max,
   step = 1,
   tooltipId,
   tooltip,
+  useDebounce,
   ...props
 }: SliderProps) {
-  const values = props.type === "range" ? props.value : [props.value];
+  const [localValue, setLocalValue] = useState(value);
+
+  const values = (type === "range" ? localValue : [localValue]) as number[];
 
   // Get unique label points: always show min and max, plus current values if not dupes
   const labelPoints = Array.from(
     new Set([min, ...values.filter((v) => v !== min && v !== max), max])
   ).sort((a, b) => a - b);
 
+  const handleValueChange = (val: number[]) =>
+    type === "range" ? onChange([val[0], val[1]]) : onChange(val[0]);
+
+  const debouncedHandleChange = useMemo(
+    () => debounce(handleValueChange, 500, { trailing: true }),
+    []
+  );
+
+  const handleChange = (val: number[]) => {
+    type === "range" ? setLocalValue([val[0], val[1]]) : setLocalValue(val[0]);
+    if (useDebounce) {
+      debouncedHandleChange(val);
+    } else {
+      handleValueChange(val);
+    }
+  };
+
   return (
     <div className="min-w-[100px] space-y-1">
       {tooltip ? (
         <div className="flex items-center gap-2">
-          <label
-            htmlFor="score-cutoff"
-            className="text-sm font-medium text-zinc-700 dark:text-white"
-          >
+          <label htmlFor="score-cutoff" className="text-sm font-medium">
             {label}
           </label>
           <span
@@ -75,9 +97,7 @@ export default function Slider({
         max={max}
         step={step}
         value={values}
-        onValueChange={(val) =>
-          props.type === "range" ? props.onChange([val[0], val[1]]) : props.onChange(val[0])
-        }
+        onValueChange={handleChange}
         className="relative flex h-5 w-full touch-none select-none items-center"
       >
         <RadixSlider.Track className="relative h-1 grow rounded-full bg-gray-300">

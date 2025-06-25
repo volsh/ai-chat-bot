@@ -1,6 +1,5 @@
 import { createSupabaseServerClient } from "@/libs/supabase";
 import { ExportFilterOptions, EmotionTrainingRow } from "@/types";
-import { createObjectCsvStringifier } from "csv-writer";
 import { buildFilteredTrainingQuery } from "./buildFilteredTrainingQuery";
 import sanitizeInput from "../general/sanitizeInput";
 
@@ -16,7 +15,7 @@ export async function exportTrainingData(
   const { data, error } = await query;
   if (error) throw new Error("Failed to fetch data: " + error.message);
 
-  if (!data || data.length === 0) return "No data found.";
+  if (!data || data.length < 10) throw new Error("Training file must have at least 10 examples");
 
   const json = generateJSONLTrainingData(data);
   return json;

@@ -3,17 +3,13 @@ import { createSupabaseServerClient } from "@/libs/supabase";
 import { exportTrainingData } from "@/utils/ai/exportTrainingData";
 import OpenAI from "openai";
 import { v4 as uuidv4 } from "uuid";
-import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import getFilterHash from "@/utils/ai/getFilterHash";
+import pollFineTuneStatus from "@/utils/ai/pollFineTuneStatus";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
-function getFilterHash(filters: any): string {
-  const stable = JSON.stringify(filters, Object.keys(filters).sort());
-  return crypto.createHash("sha256").update(stable).digest("hex");
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -23,12 +19,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const user = userData?.user;
   if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-  const filters = req.body;
+  const { filters, name } = req.body;
   const filterHash = getFilterHash(filters);
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
 
   try {
+    const { data: existingFilterHash } = await supabase
+      .from("fine_tune_snapshots")
+      .select("id")
+      .eq("filter_hash", filterHash)
+      .limit(1)
+      .maybeSingle();
+
+    const { data: latestSnapshot } = await supabase
+      .from("fine_tune_snapshots")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    const { data: lastChange } = await supabase
+      .from("emotion_log_changes")
+      .select("change_timestamp")
+      .order("change_timestamp", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (lastChange?.change_timestamp <= latestSnapshot?.created_at && existingFilterHash?.id) {
+      return res.status(423).json({ error: "A snapshot with the same filters already exists." });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+
     const { data: recentLock } = await supabase
       .from("fine_tune_locks")
       .select("created_at")
@@ -38,9 +60,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .limit(1)
       .single();
 
-    const lastExport = new Date(recentLock?.created_at || 0);
+    const lastExport = recentLock?.created_at ? new Date(recentLock.created_at) : new Date(0); // Fallback to epoch (0) if no created_at
+
+    // Check if the lock was set within the last 5 minutes
     if (recentLock && now.getTime() - lastExport.getTime() < 5 * 60 * 1000) {
-      return res.status(200).json({ locked: true, expiresAt });
+      return res.status(423).json({ locked: true, expiresAt }); // Use 423 Locked to indicate the resource is temporarily locked
     }
 
     const jsonString = await exportTrainingData(supabase, filters);
@@ -66,6 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: newSnapshot, error: snapshotError } = await supabase
       .from("fine_tune_snapshots")
       .insert({
+        name,
         uploaded_by: user.id,
         user_id: user.id,
         model_version: fineTuneJob.model,
@@ -73,7 +98,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         filters,
         filter_hash: filterHash,
         file_path: fileName,
-        openai_job_id: fineTuneJob.id,
         file_name: openaiFile.filename,
         file_id: openaiFile.id,
         job_status: fineTuneJob.status,
@@ -88,7 +112,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { error: lockError } = await supabase.from("fine_tune_locks").upsert({
       snapshot_id: newSnapshot.id,
       user_id: user.id,
-      filter_hash: filterHash,
       context: "export",
       expires_at: expiresAt.toISOString(),
       locked_until: expiresAt.toISOString(),
@@ -99,8 +122,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error(lockError.message);
     }
 
-    // 🧠 Background poller to call webhook manually
-    pollFineTuneStatus(fineTuneJob.id, fineTuneJob.model, fineTuneJob.status);
+    // 🧠 Background poller to call edge function
+    pollFineTuneStatus(newSnapshot.id, fineTuneJob.id, supabase);
 
     return res.status(200).json({
       success: true,
@@ -111,40 +134,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("Fine-tune export error:", err);
     return res.status(500).json({ error: err.message });
   }
-}
-
-function pollFineTuneStatus(jobId: string, model: string, initialStatus: string) {
-  const interval = 60 * 1000 * 10; // 10 minute
-  const MAX_POLL_ATTEMPTS = 3;
-  let attempts = 0;
-
-  const poll = async () => {
-    attempts++;
-    if (attempts > MAX_POLL_ATTEMPTS) {
-      console.warn("Polling timeout reached");
-      return;
-    }
-    try {
-      const job = await openai.fineTuning.jobs.retrieve(jobId);
-
-      await fetch(`${process.env.SUPABASE_FUNCTIONS_URL}/notify-fine-tune-status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: job.id,
-          status: job.status,
-          model: job.model,
-          error: job.error || null,
-        }),
-      });
-
-      if (job.status === "succeeded" || job.status === "failed") return;
-      setTimeout(poll, interval);
-    } catch (err) {
-      console.error("Polling error:", err);
-    }
-  };
-
-  // Start with current known status
-  poll();
 }

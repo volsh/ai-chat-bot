@@ -27,7 +27,7 @@ export default function AnnotationModal({
   const [correctedIntensity, setCorrectedIntensity] = useState(initialAnnotation?.intensity || 0.5);
   const [note, setNote] = useState(initialAnnotation?.note || "");
   const [flagReason, setFlagReason] = useState(initialAnnotation?.flag_reason || "");
-  const [severity, setSeverity] = useState(initialAnnotation?.severity || "high");
+  const [severity, setSeverity] = useState(initialAnnotation?.severity || "low");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {

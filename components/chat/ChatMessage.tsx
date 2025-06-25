@@ -69,7 +69,7 @@ export default function ChatMessage({
       <div className="flex justify-between gap-1 text-xs text-gray-500 dark:text-gray-100">
         <span className="font-medium capitalize">{msg.role}</span>
         <span className="flex flex-wrap items-center gap-2">
-          {emotion && (
+          {emotion && isTherapist && (
             <>
               {emotion.flagged && (
                 <div

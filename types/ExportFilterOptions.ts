@@ -1,3 +1,5 @@
+import { boolean } from "zod";
+
 export type ExportFilterOptions = {
   emotions?: string[];
   tones?: string[];
@@ -7,11 +9,14 @@ export type ExportFilterOptions = {
   includeCorrected?: boolean;
   correctedBy?: string;
   highRiskOnly?: boolean;
-  userId?: string;
-  therapistId?: string;
-  role?: string[]; // e.g., user or assistant
+  users?: string[];
+  therapists?: string[];
+  messageRole?: string[]; // e.g., user or assistant
   startDate?: string;
   endDate?: string;
   topN?: number;
   scoreCutoff?: number;
+  flaggedOnly?: boolean;
+  flagReasons?: string[];
+  agreement?: [number, number];
 };
