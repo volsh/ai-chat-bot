@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Emotion, Message, MessageWithEmotion, Session } from "@/types";
-import { loadSessionMessages, saveMessageToSupabase, updateSessionTitle } from "@/utils/supabase";
+import { loadSessionMessages, updateSessionTitle } from "@/utils/supabase";
 import { sendChatMessage } from "@/utils/api";
 import clsx from "clsx";
 import { exportChatToPDF } from "@/utils/export";
@@ -17,6 +17,8 @@ import { useAppStore } from "@/state";
 import { AnimatePresence } from "framer-motion";
 import { useShallow } from "zustand/react/shallow";
 import ChatMessage from "./ChatMessage";
+import saveMessageToDB from "@/utils/chat/saveMessageToDB";
+import startNewChat from "@/utils/chat/startNewChat";
 
 interface ChatBoxProps {
   initialSession?: Session;
@@ -30,18 +32,20 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const typingTimeout = useRef<NodeJS.Timeout>();
+  const [session, setSession] = useState<Session>();
   const [summary, setSummary] = useState<string>(initialSession?.summary!);
   const [showEditor, setShowEditor] = useState(false);
   const [emotionLogs, setEmotionLogs] = useState<Record<string, MessageWithEmotion>>({});
   const [tagAssistantEnabled, setTagAssistantEnabled] = useState(true);
   const [showSummary, setShowSummary] = useState(true);
   const [expandedSummary, setExpandedSummary] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isExpired, setIsExpired] = useState(false);
 
   const { userProfile } = useAppStore(useShallow((s) => ({ userProfile: s.userProfile })));
   const userId = userProfile?.id;
   const sessionId = initialSession?.id;
   const { othersTyping, setTyping } = usePresenceChannel(sessionId, userId);
-  const router = useRouter();
   const countMessagesForSummary = useRef(0);
 
   const isTherapist = userProfile?.role === "therapist";
@@ -53,6 +57,16 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   useEffect(() => {
     if (initialSession?.summary) setSummary(initialSession.summary);
   }, [initialSession]);
+
+  const fetchSession = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single();
+
+    setSession(data);
+  }, [sessionId]);
 
   const fetchMessages = useCallback(() => {
     if (!userId) return;
@@ -79,11 +93,53 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
 
   useEffect(() => {
     if (sessionId) {
+      fetchSession();
       fetchMessages();
       const savedDraft = localStorage.getItem(`draft-${sessionId}`);
       if (savedDraft) setInput(savedDraft);
     }
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!session) return;
+    const createdAt = new Date(session.created_at).getTime();
+    const now = Date.now();
+    const expiresAt = createdAt + 2 * 60 * 60 * 1000;
+
+    if (session.ended_at) {
+      setIsExpired(true);
+      setCountdown(null);
+      return;
+    }
+
+    if (now >= expiresAt) {
+      setIsExpired(true);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const remaining = expiresAt - Date.now();
+      if (remaining <= 0) {
+        clearInterval(interval);
+        setIsExpired(true);
+        setCountdown(null);
+
+        supabase
+          .from("sessions")
+          .update({ ended_at: new Date().toISOString() }) // or use your preferred naming
+          .eq("id", sessionId)
+          .then(({ error }) => {
+            if (error) {
+              console.error("Error updating ended_at:", error);
+            }
+          });
+      } else {
+        setCountdown(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [session]);
 
   useEffect(() => {
     localStorage.setItem(`draft-${sessionId}`, input);
@@ -101,7 +157,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   const generateMessageAndTagEmotion = async (messages: Message[]) => {
     try {
       const response = await sendChatMessage(sessionId!, messages);
-      const assistantMessage = await saveMessageToSupabase(sessionId!, response.message);
+      const assistantMessage = await saveMessageToDB(sessionId!, response.message);
       setMessages([...messages, assistantMessage]);
       if (tagAssistantEnabled) {
         try {
@@ -168,7 +224,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
 
     let userMessageWithId: Message;
     try {
-      userMessageWithId = await saveMessageToSupabase(sessionId!, rawMessage);
+      userMessageWithId = await saveMessageToDB(sessionId!, rawMessage);
       setMessages((prev) => [...prev, userMessageWithId]);
       const result = await tagEmotion(
         userMessageWithId.content,
@@ -210,29 +266,6 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
     const trimmed = messages.slice(0, index);
     await generateMessageAndTagEmotion(trimmed);
     setLoading(false);
-  };
-
-  const startNewChat = async () => {
-    const { data, error } = await supabase
-      .from("sessions")
-      .insert([{ user_id: userId }])
-      .select()
-      .single();
-    if (!error && data?.id) {
-      const newSessionId = data.id;
-      setMessages([]);
-      setSummary("");
-
-      await saveMessageToSupabase(newSessionId, {
-        role: "system",
-        content: "🆕 New session started. Ask me anything to begin.",
-        created_at: new Date().toISOString(),
-      } as Message);
-
-      router.push(`/chat/${newSessionId}`);
-    } else {
-      toast.error("Failed to start new chat");
-    }
   };
 
   if (!userId) {
@@ -360,8 +393,13 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
         <div ref={bottomRef} />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {!!initialSession?.ended_at && (
+        {isExpired && (
           <p className="italic text-gray-500">This session has been marked as finished.</p>
+        )}
+        {countdown && (
+          <div className="mb-2 text-sm text-gray-600">
+            Session ends in: {new Date(countdown).toISOString().substr(11, 8)}
+          </div>
         )}
         {!isTherapist && (
           <>
@@ -377,19 +415,20 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
                 typingTimeout.current = setTimeout(() => setTyping(false), 1200);
               }}
               onKeyDown={(e) => e.key === "Enter" && send()}
-              disabled={!sessionId || !!initialSession?.ended_at}
+              disabled={!sessionId || isExpired}
               aria-label="chat input"
             />
             <button
               onClick={send}
               className="rounded-md bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
-              disabled={!sessionId || loading || !!initialSession?.ended_at}
+              disabled={!sessionId || loading || isExpired}
             >
               Send
             </button>
             <button
-              onClick={startNewChat}
-              className="rounded bg-gray-200 px-3 py-1 text-sm text-zinc-700 shadow dark:bg-zinc-700 dark:text-white"
+              onClick={() => startNewChat(session?.treatment_id!)}
+              className="rounded bg-gray-200 px-3 py-1 text-sm text-zinc-700 shadow disabled:opacity-50 dark:bg-zinc-700 dark:text-white"
+              disabled={!session}
             >
               ➕ New Chat
             </button>
@@ -409,10 +448,11 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
                   .from("sessions")
                   .update({ ended_at: new Date() })
                   .eq("id", sessionId);
+                fetchSession();
                 onRefresh?.();
               }}
-              className="mt-4 rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
-              disabled={!sessionId || !!initialSession?.ended_at}
+              className="mt-4 rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 disabled:opacity-50"
+              disabled={!sessionId || isExpired}
             >
               Finish Chat
             </button>

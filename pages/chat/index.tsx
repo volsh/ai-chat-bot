@@ -22,14 +22,25 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   if (role === "therapist") {
     const { client } = context.query;
     if (client) {
-      const { data: lastSession } = await supabase
+      const { data: sessions, error } = await supabase
         .from("sessions")
-        .select("id")
-        .eq("user_id", client)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      destination = `/chat/${lastSession?.id}`;
+        .select("id, treatments(user_id)")
+        .order("created_at", { ascending: false });
+
+      if (error || !sessions?.length) {
+        destination = "/dashboard/therapist";
+      } else {
+        const lastSession = sessions.find(
+          (s) =>
+            Array.isArray(s.treatments) &&
+            s.treatments.some((treatment) => treatment.user_id === client)
+        );
+        if (lastSession) {
+          destination = `/chat/${lastSession?.id}`;
+        } else {
+          destination = "/dashboard/therapist";
+        }
+      }
     } else {
       destination = "/dashboard/therapist";
     }

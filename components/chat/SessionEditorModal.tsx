@@ -4,12 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { supabaseBrowserClient as supabase } from "@/libs/supabase";
 import EmojiPicker from "emoji-picker-react";
 import { toast } from "react-hot-toast";
-import { Folder, Team, SupabaseTeamResponse, UserProfile } from "@/types";
-import { format } from "date-fns";
-import { PostgrestError } from "@supabase/supabase-js";
 import { useAppStore } from "@/state";
 import { useShallow } from "zustand/react/shallow";
-import TherapistList from "../therapist/AllTherpistsList"; // Correct import for TherapistList component
 import Modal from "../ui/modal";
 import Spinner from "../ui/spinner";
 
@@ -34,14 +30,8 @@ export default function SessionEditorModal({
   const [title, setTitle] = useState(initialTitle);
   const [emoji, setEmoji] = useState("\ud83e\udde0");
   const [color, setColor] = useState("#3b82f6");
-  const [goal, setGoal] = useState("Therapy");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [folderId, setFolderId] = useState<string | null>(null);
-  const [folders, setFolders] = useState<Folder[]>([]);
   const [summary, setSummary] = useState("");
-  const [teamId, setTeamId] = useState("");
-  const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
-  const [sharedWith, setSharedWith] = useState<string[]>([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -57,63 +47,21 @@ export default function SessionEditorModal({
   useEffect(() => {
     if (!sessionId || !userProfile) return;
     const fetchData = async () => {
-      const [{ data: sessionData }, { data: folderData }] = await Promise.all([
-        supabase.from("sessions").select("*").eq("id", sessionId).single(),
-        supabase.from("folders").select("*"),
-      ]);
+      const { data: sessionData } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("id", sessionId)
+        .single();
+
       if (sessionData) {
         setTitle(sessionData.title || "");
         setEmoji(sessionData.emoji || "\ud83e\udde0");
         setColor(sessionData.color || "#3b82f6");
-        setGoal(sessionData.goal || "Therapy");
-        setFolderId(sessionData.folder_id || null);
         setSummary(sessionData.summary || "");
-        setTeamId(sessionData.team_id || "");
-        setSharedWith(sessionData.shared_with || []);
       }
-      setFolders(folderData || []);
     };
     fetchData();
   }, [sessionId, userProfile]);
-
-  // Fetching teams and therapists
-  useEffect(() => {
-    const loadTeams = async () => {
-      const { data, error } = (await supabase.from("teams").select(`
-        id,
-        name,
-        description,
-        team_members (
-          joined_at,
-          users (
-            id,
-            email,
-            full_name,
-            role
-          )
-        )
-      `)) as unknown as { data: SupabaseTeamResponse[]; error: PostgrestError };
-      if (error) {
-        toast.error("Failed to load teams");
-        return;
-      }
-      const flattened = (data || []).map((team) => ({
-        id: team.id,
-        name: team.name,
-        description: team.description ?? "",
-        team_members: (team.team_members || [])
-          .filter((tm) => tm.users?.role === "therapist")
-          .map((tm) => ({
-            id: tm.users!.id,
-            full_name: tm.users!.full_name ?? null,
-            email: tm.users!.email,
-            joined_at: tm.joined_at,
-          })),
-      }));
-      setAvailableTeams(flattened);
-    };
-    loadTeams();
-  });
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -128,11 +76,7 @@ export default function SessionEditorModal({
         title: title.trim(),
         emoji,
         color,
-        goal,
-        folder_id: folderId,
         summary,
-        team_id: teamId || null,
-        shared_with: sharedWith,
       })
       .eq("id", sessionId);
     if (error) {
@@ -181,7 +125,7 @@ export default function SessionEditorModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-lg bg-white p-5 text-zinc-700 shadow-xl transition-all dark:bg-zinc-900 dark:text-white">
+      <div className="relative h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-lg bg-white p-5 text-zinc-700 shadow-xl transition-all dark:bg-zinc-900 dark:text-white">
         <h2 className="text-lg font-semibold">🛠 Edit Session</h2>
 
         <div>
@@ -227,103 +171,6 @@ export default function SessionEditorModal({
               className="h-10 w-16 rounded border dark:bg-zinc-800"
             />
           </div>
-
-          <div className="flex flex-col">
-            <label className="text-sm">Goal</label>
-            <select
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              className="rounded border p-1 text-black dark:bg-zinc-800 dark:text-white"
-            >
-              <option value="Therapy">Therapy</option>
-              <option value="Career">Career</option>
-              <option value="Relationships">Relationships</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-sm">Folder</label>
-            <select
-              value={folderId || ""}
-              onChange={(e) => setFolderId(e.target.value || null)}
-              className="rounded border p-1 text-black dark:bg-zinc-800 dark:text-white"
-            >
-              <option value="">No Folder</option>
-              {folders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.emoji || "📁"} {f.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Therapist Selection using TherapistList */}
-        <div>
-          {isDeleting && <Spinner />}
-
-          <h3 className="text-sm font-medium">Share This Session With a Therapist Team</h3>
-          {availableTeams.length === 0 && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              No public therapist teams available for sharing.
-            </p>
-          )}
-
-          {availableTeams.map((team) => (
-            <div
-              key={team.id}
-              className={`rounded border p-3 text-zinc-700 transition-all dark:border-zinc-700 dark:text-white ${
-                team.id === teamId
-                  ? "border-blue-500 bg-blue-50 dark:bg-zinc-800"
-                  : "bg-white dark:bg-zinc-900"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{team.name}</h3>
-                <button
-                  onClick={async () => {
-                    const { error } = await supabase
-                      .from("sessions")
-                      .update({ team_id: team.id })
-                      .eq("id", sessionId);
-
-                    if (error) {
-                      toast.error("Failed to update session team");
-                    } else {
-                      setTeamId(team.id!);
-                      toast.success("Session shared with " + team.name);
-                      onRefresh?.();
-                    }
-                  }}
-                  className={`rounded px-3 py-1 text-sm ${
-                    team.id === teamId ? "bg-green-600 text-white" : "bg-blue-600 text-white"
-                  }`}
-                >
-                  {team.id === teamId ? "Selected" : "Share with this team"}
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Therapists:</p>
-              <ul className="text-sm">
-                {team.team_members.map((m) => (
-                  <li key={m.id}>
-                    • {m.full_name || m.email}{" "}
-                    <span className="text-xs text-gray-400">
-                      (joined {format(new Date(m.joined_at!), "MMM yyyy")})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        {/* Share with Individual Therapists */}
-        <div>
-          <TherapistList
-            sharedWith={sharedWith}
-            setSharedWith={setSharedWith}
-            label="Share With Individual Therapists"
-          />
         </div>
 
         <div>
@@ -382,7 +229,7 @@ export default function SessionEditorModal({
 
         <button
           onClick={onClose}
-          className="w-full text-center text-sm text-zinc-500 underline dark:text-zinc-400"
+          className="absolute bottom-1 left-1/2 -translate-x-1/2 text-center text-sm text-zinc-500 underline dark:text-zinc-400"
         >
           Close
         </button>

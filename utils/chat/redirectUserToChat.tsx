@@ -8,33 +8,50 @@ export const redirectUserToChat = async (context: GetServerSidePropsContext) => 
   );
 
   const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData || !userData.user) {
+  if (!userData?.user) {
     return { redirect: { destination: "/auth/login", permanent: false } };
   }
 
-  const { user } = userData;
+  const userId = userData.user.id;
 
-  const { data: lastSession } = await supabase
-    .from("sessions")
-    .select("id")
-    .eq("user_id", user?.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+  // ⚡️ 1️⃣ Get treatments for the user
+  const { data: treatments } = await supabase.from("treatments").select("id").eq("user_id", userId);
 
-  let sessionId = lastSession?.id;
+  const treatmentIds = treatments?.map((t) => t.id) ?? [];
+  let sessionId: string | undefined;
 
-  if (!sessionId) {
-    const { data: newSession } = await supabase
+  // ⚡️ 2️⃣ Get the latest session across treatments
+  if (treatmentIds.length > 0) {
+    const { data: lastSession } = await supabase
       .from("sessions")
-      .insert([{ user_id: user.id }])
-      .select()
+      .select("id")
+      .in("treatment_id", treatmentIds)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .single();
 
-    sessionId = newSession?.id;
+    sessionId = lastSession?.id;
   }
 
+  // ⚡️ 3️⃣ If no session, create one for the first treatment
+  if (!sessionId) {
+    if (treatmentIds.length > 0) {
+      const { data: newSession } = await supabase
+        .from("sessions")
+        .insert([{ treatment_id: treatmentIds[0] }])
+        .select()
+        .single();
+
+      sessionId = newSession?.id;
+    } else {
+      // If no treatments at all redirect to treatments page
+      return {
+        redirect: { destination: "/treatments/", permanent: false },
+      };
+    }
+  }
+
+  // ⚡️ Final Redirection
   return {
     redirect: {
       destination: `/chat/${sessionId}`,

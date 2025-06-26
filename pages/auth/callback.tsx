@@ -57,14 +57,15 @@ export default function AuthCallback() {
         return router.replace("/dashboard/therapist");
       }
 
-      redirectToChat();
+      // redirectToChat();
+      return router.replace("/treatments");
     };
 
     finalize();
     return () => {
       cancelled = true;
     };
-  }, [loadingProfile, session, userProfile, error, next, router, redirectToChat]);
+  }, [loadingProfile, session, userProfile, error, next, router]);
 
   return (
     <p className="mt-20 text-center text-gray-500">

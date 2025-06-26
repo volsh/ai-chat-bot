@@ -13,3 +13,4 @@ export * from "./UserProfile";
 export * from "./FlaggedSession";
 export * from "./Team";
 export * from "./InviteLog";
+export * from "./Treatment";

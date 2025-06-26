@@ -10,5 +10,6 @@ export interface Session {
   folder_id: string;
   order_index: number;
   summary?: string;
-  bookmarked?: string;
+  bookmarked?: boolean;
+  treatment_id: string;
 }

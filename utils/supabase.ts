@@ -15,28 +15,6 @@ export async function loadSession(sessionId: string): Promise<Session> {
   return data;
 }
 
-export async function saveMessageToSupabase(
-  sessionId: string,
-  msg: Partial<Message>
-): Promise<Message> {
-  const { data, error } = await supabase
-    .from("messages")
-    .insert([{ session_id: sessionId, role: msg.role, content: msg.content }])
-    .select("*")
-    .single();
-  if (error) {
-    console.error("Failed to save message:", error);
-    throw new Error(error.message || "Failed to save message");
-  }
-
-  return {
-    ...data,
-    message_created_at: data.created_at,
-    source_id: data.id,
-    source_type: "session",
-  };
-}
-
 export async function loadSessionMessages(sessionId: string): Promise<MessageWithEmotion[]> {
   const { data, error } = await supabase
     .from("v_emotion_training_data")
