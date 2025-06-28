@@ -23,8 +23,6 @@ export type EmotionTrainingRow = {
   score: number;
   flagged: boolean;
   flag_reason: string;
-  severity: "high" | "medium" | "low";
   goal: string;
-  aligned_with_goal: boolean;
   alignment_score: number;
 };

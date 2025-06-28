@@ -1,10 +1,10 @@
 import { supabaseBrowserClient } from "@/libs/supabase";
-import { Message } from "@/types";
+import { Message, MessageWithEmotion } from "@/types";
 
 export default async function saveMessageToDB(
   sessionId: string,
   msg: Partial<Message>
-): Promise<Message> {
+): Promise<MessageWithEmotion> {
   const { data, error } = await supabaseBrowserClient
     .from("messages")
     .insert([{ session_id: sessionId, role: msg.role, content: msg.content }])
@@ -20,5 +20,6 @@ export default async function saveMessageToDB(
     message_created_at: data.created_at,
     source_id: data.id,
     source_type: "session",
+    message_role: data.role,
   };
 }

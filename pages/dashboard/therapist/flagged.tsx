@@ -32,20 +32,25 @@ export default function TherapistReviewPanel() {
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [selectedMsg, setSelectedMsg] = useState<MessageWithEmotion | null>(null);
   const [showTopBtn, setShowTopBtn] = useState(false);
+  const [collapsedTreatments, setCollapsedTreatments] = useState<Record<string, boolean>>({});
+
+  const toggleTreatment = (tid: string) =>
+    setCollapsedTreatments((prev) => ({ ...prev, [tid]: !prev[tid] }));
 
   const { filters, setFilter, resetFilters } = useSavedFilters<ExportFilterOptions>(
     "therapist_sessions_view_filters",
     {
-      emotions: [] as string[],
-      intensity: [0.1, 1] as [number, number],
-      flagReasons: [] as string[],
-      tones: [] as string[],
+      emotions: [],
+      intensity: [0.1, 1],
+      flagReasons: [],
+      tones: [],
       startDate: "",
       endDate: "",
-      highRiskOnly: false as boolean,
-      agreement: [0, 100] as [number, number],
-      flaggedOnly: false as boolean,
-      messageRole: [] as string[],
+      highRiskOnly: false,
+      agreement: [0, 100],
+      flaggedOnly: false,
+      messageRole: [],
+      goals: [],
     }
   );
 
@@ -60,7 +65,6 @@ export default function TherapistReviewPanel() {
     const { data } = await supabase.rpc("list_flagged_sessions", {
       therapist_uuid: userProfile.id,
     });
-
     const grouped = new Map<string, FlaggedSession>();
     for (const row of data) {
       const existing =
@@ -90,6 +94,7 @@ export default function TherapistReviewPanel() {
           s.client_name.toLowerCase().includes(query.toLowerCase())) &&
         (!filters.flagReasons?.length ||
           (s.top_reasons || []).some((r) => filters.flagReasons?.includes(r))) &&
+        (!filters.goals?.length || filters.goals.includes(s.goal_title || "")) &&
         (!filters.agreement ||
           ((s.ai_agreement_rate ?? 0) >= filters.agreement[0] &&
             (s.ai_agreement_rate ?? 0) <= filters.agreement[1])) &&
@@ -97,14 +102,13 @@ export default function TherapistReviewPanel() {
           (f) =>
             (!filters.flaggedOnly || f.flag_reason) &&
             (!filters.intensity ||
-              ((f.intensity ?? 0) >= filters.intensity[0] &&
-                (f.intensity ?? 0) <= filters.intensity[1])) &&
+              (!f.intensity && filters.intensity[0] === 0.1 && filters.intensity[1] === 1) ||
+              (f.intensity! >= filters.intensity[0] && f.intensity! <= filters.intensity[1])) &&
             (!filters.emotions?.length || (f.emotion && filters.emotions.includes(f.emotion))) &&
             (!filters.tones?.length || (f.tone && filters.tones.includes(f.tone))) &&
             (!filters.flagReasons?.length ||
               (f.flag_reason && filters.flagReasons.includes(f.flag_reason))) &&
             (!filters.highRiskOnly ||
-              f.severity === "high" ||
               (f.tone === "negative" && f.intensity && f.intensity >= 0.8)) &&
             (!filters.startDate ||
               (f.annotation_updated_at && f.annotation_updated_at >= filters.startDate)) &&
@@ -139,6 +143,16 @@ export default function TherapistReviewPanel() {
         new Date(messageB.message_created_at)
       );
     });
+
+  const groupedByTreatment = filtered.reduce(
+    (acc, session) => {
+      const tid = session.treatment_id || "untitled";
+      if (!acc[tid]) acc[tid] = [];
+      acc[tid].push(session);
+      return acc;
+    },
+    {} as Record<string, FlaggedSession[]>
+  );
 
   const paginated = filtered.slice(0, page * 10);
 
@@ -178,10 +192,6 @@ export default function TherapistReviewPanel() {
     link.click();
     URL.revokeObjectURL(url);
   };
-
-  if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading therapist data…</div>;
-  }
 
   return (
     <div className="p-6">
@@ -234,19 +244,6 @@ export default function TherapistReviewPanel() {
             value={[filters.intensity?.[0], filters.intensity?.[1]] as [number, number]}
             onChange={(v) => setFilter("intensity", v)}
           />
-          <Slider
-            type="range"
-            label="Min Agreement %"
-            min={0}
-            max={100}
-            value={[filters.agreement?.[0], filters.agreement?.[1]] as [number, number]}
-            onChange={(v) => setFilter("agreement", v)}
-          />
-          <Toggle
-            label="Flagged Only"
-            checked={filters.flaggedOnly || false}
-            onChange={(v) => setFilter("flaggedOnly", v)}
-          />
           <Toggle
             label={
               <span className="inline-flex items-center gap-1">
@@ -262,11 +259,31 @@ export default function TherapistReviewPanel() {
             checked={filters.highRiskOnly || false}
             onChange={(v) => setFilter("highRiskOnly", v)}
           />
+          <Toggle
+            label="Flagged Only"
+            checked={filters.flaggedOnly || false}
+            onChange={(v) => setFilter("flaggedOnly", v)}
+          />
           <MultiSelectFilter
             label="Flag reason"
             values={filters.flagReasons || []}
             onChange={(v) => setFilter("flagReasons", v)}
             options={[...new Set(sessions.flatMap((s) => s.top_reasons || []))]}
+          />
+          <MultiSelectFilter
+            label="Goals"
+            values={filters.goals || []}
+            onChange={(v) => setFilter("goals", v)}
+            options={[...new Set(sessions.flatMap((s) => s.goal_title || "").filter(Boolean))]}
+          />
+
+          <Slider
+            type="range"
+            label="Min Agreement %"
+            min={0}
+            max={100}
+            value={[filters.agreement?.[0], filters.agreement?.[1]] as [number, number]}
+            onChange={(v) => setFilter("agreement", v)}
           />
           <DateRangePicker
             value={{ from: filters.startDate!, to: filters.endDate! }}
@@ -290,7 +307,7 @@ export default function TherapistReviewPanel() {
           </div>
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 border px-3 py-1 text-sm"
+            className="inline-flex items-center gap-2 self-end border px-3 py-1 text-sm"
           >
             <FileDown size={16} /> Export CSV
           </button>
@@ -310,7 +327,7 @@ export default function TherapistReviewPanel() {
 
               setSelectedIds([]);
             }}
-            className="inline-flex items-center gap-2 border px-3 py-1 text-sm disabled:opacity-50"
+            className="inline-flex items-center gap-2 self-end border px-3 py-1 text-sm disabled:opacity-50"
             disabled={selectedIds.length === 0}
             title={selectedIds.length === 0 ? "No sessions selected" : ""}
           >
@@ -319,39 +336,93 @@ export default function TherapistReviewPanel() {
         </div>
       </CollapsibleSection>
 
-      {paginated.map((session) => (
-        <SessionCard
-          key={session.session_id}
-          session={session}
-          selected={selectedIds.includes(session.session_id)}
-          onToggle={() => toggleSelected(session.session_id)}
-          showFlags={true}
-          filterFlags={(m) => {
-            const shouldShow =
-              (!filters.flaggedOnly || m.flag_reason) &&
-              (!filters.emotions?.length || filters.emotions.includes(m.emotion ?? "")) &&
-              (!filters.tones?.length || filters.tones.includes(m.tone ?? "")) &&
-              (!filters.intensity ||
-                ((m.intensity ?? 0) >= filters.intensity[0] &&
-                  (m.intensity ?? 0) <= filters.intensity[1])) &&
-              (!filters.flagReasons?.length || filters.flagReasons.includes(m.flag_reason ?? "")) &&
-              (!filters.highRiskOnly ||
-                m.severity === "high" ||
-                (m.tone === "negative" && m.intensity && m.intensity >= 0.8)) &&
-              (!filters.startDate ||
-                (m.annotation_updated_at && m.annotation_updated_at >= filters.startDate)) &&
-              (!filters.endDate ||
-                (m.annotation_updated_at && m.annotation_updated_at <= filters.endDate)) &&
-              (!filters.messageRole?.length || filters.messageRole.includes(m.message_role!));
+      {loading && <div className="mt-10 text-center text-gray-500">Loading therapist data…</div>}
 
-            return Boolean(shouldShow);
-          }}
-          onAnnotate={(msg) => {
-            setSelectedMsg(msg);
-            setShowAnnotations(true);
-          }}
-        />
-      ))}
+      {!loading && sessions.length === 0 && (
+        <div className="mt-10 text-center text-gray-500">
+          <p className="text-lg font-semibold">No sessions found</p>
+          <p className="text-sm text-gray-400">
+            You haven't been assigned any sessions yet. Shared sessions will appear here.
+          </p>
+        </div>
+      )}
+
+      {!loading && sessions.length > 0 && filtered.length === 0 && (
+        <div className="mt-10 text-center text-gray-500">
+          <p className="text-lg font-semibold">No matching sessions</p>
+          <p className="text-sm text-gray-400">Try adjusting your filters to see more results.</p>
+          <div className="mt-4">
+            <ClearFiltersButton onClick={resetFilters} />
+          </div>
+        </div>
+      )}
+
+      {!loading &&
+        filtered.length > 0 &&
+        Object.entries(groupedByTreatment).map(([treatmentId, sessionsInGroup]) => (
+          <CollapsibleSection
+            key={treatmentId}
+            title={
+              <div className="mb-2 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2">
+                  {sessionsInGroup[0]?.treatment_emoji && (
+                    <span className="text-xl">{sessionsInGroup[0].treatment_emoji}</span>
+                  )}
+                  <span
+                    className="rounded-full px-3 py-1 text-sm font-medium text-white"
+                    style={{
+                      backgroundColor: sessionsInGroup[0]?.treatment_color || "#999",
+                    }}
+                  >
+                    {sessionsInGroup[0]?.treatment_title || "Untitled"}
+                  </span>
+                </div>
+
+                {sessionsInGroup[0]?.goal_title && (
+                  <span className="text-sm text-gray-500">
+                    Goal: {sessionsInGroup[0].goal_title}
+                  </span>
+                )}
+              </div>
+            }
+            defaultOpen
+          >
+            {sessionsInGroup.map((session) => (
+              <SessionCard
+                key={session.session_id}
+                session={session}
+                selected={selectedIds.includes(session.session_id)}
+                onToggle={() => toggleSelected(session.session_id)}
+                filterFlags={(m) => {
+                  const shouldShow =
+                    (!filters.flaggedOnly || m.flag_reason) &&
+                    (!filters.emotions?.length || filters.emotions.includes(m.emotion ?? "")) &&
+                    (!filters.tones?.length || filters.tones.includes(m.tone ?? "")) &&
+                    (!filters.intensity ||
+                      (!m.intensity &&
+                        filters.intensity[0] === 0.1 &&
+                        filters.intensity[1] === 1) ||
+                      (m.intensity! >= filters.intensity[0] &&
+                        m.intensity! <= filters.intensity[1])) &&
+                    (!filters.flagReasons?.length ||
+                      filters.flagReasons.includes(m.flag_reason ?? "")) &&
+                    (!filters.highRiskOnly ||
+                      (m.tone === "negative" && m.intensity && m.intensity >= 0.8)) &&
+                    (!filters.startDate ||
+                      (m.annotation_updated_at && m.annotation_updated_at >= filters.startDate)) &&
+                    (!filters.endDate ||
+                      (m.annotation_updated_at && m.annotation_updated_at <= filters.endDate)) &&
+                    (!filters.messageRole?.length || filters.messageRole.includes(m.message_role!));
+                  return Boolean(shouldShow);
+                }}
+                onAnnotate={(msg) => {
+                  setSelectedMsg(msg);
+                  setShowAnnotations(true);
+                }}
+              />
+            ))}
+          </CollapsibleSection>
+        ))}
 
       {filtered.length > paginated.length && (
         <div className="mt-4 text-center">
@@ -377,6 +448,7 @@ export default function TherapistReviewPanel() {
           }}
         />
       )}
+
       {showTopBtn && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}

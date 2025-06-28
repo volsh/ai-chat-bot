@@ -20,41 +20,68 @@ export default function AnnotationDiff({ emotion }: Props) {
     </span>
   );
 
+  if (
+    !emotion.emotion &&
+    !emotion.tone &&
+    !emotion.intensity &&
+    !emotion.topic &&
+    !emotion.alignment_score
+  )
+    return null;
+
   return (
     <div className="mt-2 space-y-2 rounded border bg-white p-2 text-xs text-gray-800 dark:bg-zinc-900 dark:text-gray-200">
-      <div className="flex items-center gap-2">
-        <span className="font-medium">Emotion:</span>
-        <Chip value={emotion.original_emotion!} />
-        {emotion.original_emotion !== emotion.emotion && (
-          <Chip value={emotion.emotion!} corrected />
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="font-medium">Tone:</span>
-        <Chip value={emotion.original_tone!} />
-        {emotion.original_tone !== emotion.tone && (
-          <Chip value={emotion.tone!} corrected />
-        )}
-      </div>
-
-      {emotion.original_topic && (
+      {emotion.emotion && (
         <div className="flex items-center gap-2">
-          <span className="font-medium">Topic:</span>
-          <Chip value={emotion.original_topic!} />
-          {emotion.original_topic !== emotion.topic && (
-            <Chip value={emotion.topic!} corrected />
+          <span className="font-medium">Emotion:</span>
+          {emotion.original_emotion && <Chip value={emotion.original_emotion} />}
+          {emotion.corrected_emotion && emotion.corrected_emotion !== emotion.original_emotion && (
+            <Chip value={emotion.corrected_emotion} corrected />
           )}
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <span className="font-medium">Intensity:</span>
-        <Chip value={emotion.original_intensity?.toFixed(2)!} />
-        {emotion.original_intensity !== emotion.intensity && (
-          <Chip value={emotion.intensity?.toFixed(2)!} corrected />
-        )}
-      </div>
+      {emotion.tone && (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">Tone:</span>
+          {emotion.original_tone && <Chip value={emotion.original_tone} />}
+          {emotion.corrected_tone && emotion.original_tone !== emotion.corrected_tone && (
+            <Chip value={emotion.corrected_tone!} corrected />
+          )}
+        </div>
+      )}
+
+      {emotion.topic && (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">Topic:</span>
+          {emotion.original_topic && <Chip value={emotion.original_topic} />}
+          {emotion.corrected_topic && emotion.corrected_topic !== emotion.original_topic && (
+            <Chip value={emotion.corrected_tone!} corrected />
+          )}
+        </div>
+      )}
+      {emotion.intensity && (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">Intensity:</span>
+          {emotion.original_intensity && <Chip value={emotion.original_intensity} />}
+          {emotion.corrected_intensity &&
+            emotion.corrected_intensity !== emotion.original_intensity && (
+              <Chip value={emotion.corrected_intensity?.toFixed(2)!} corrected />
+            )}
+        </div>
+      )}
+
+      {emotion.alignment_score && (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">Alignment Score:</span>
+          {emotion.original_alignment_score && (
+            <Chip value={emotion.original_alignment_score.toFixed(2)} />
+          )}
+          {emotion.corrected_alignment_score !== emotion.original_alignment_score && (
+            <Chip value={emotion.corrected_alignment_score?.toFixed(2)!} corrected />
+          )}
+        </div>
+      )}
 
       {emotion.note && (
         <div>

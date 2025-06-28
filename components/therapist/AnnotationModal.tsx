@@ -4,7 +4,7 @@ import Input from "@/components/ui/input";
 import TextArea from "@/components/ui/textarea";
 import { toast } from "react-hot-toast";
 import { MessageWithEmotion } from "@/types";
-import Select from "../ui/select";
+import Toggle from "../ui/toggle";
 
 interface AnnotationModalProps {
   onClose: () => void;
@@ -24,10 +24,13 @@ export default function AnnotationModal({
   const [correctedEmotion, setCorrectedEmotion] = useState(initialAnnotation?.emotion || "");
   const [correctedTone, setCorrectedTone] = useState(initialAnnotation?.tone || "");
   const [correctedTopic, setCorrectedTopic] = useState(initialAnnotation?.topic || "");
-  const [correctedIntensity, setCorrectedIntensity] = useState(initialAnnotation?.intensity || 0.5);
+  const [correctedIntensity, setCorrectedIntensity] = useState(initialAnnotation?.intensity || 0);
+  const [correctedAlignmentScore, setCorrectedAlignmentScore] = useState(
+    initialAnnotation?.alignment_score || 0
+  );
+
   const [note, setNote] = useState(initialAnnotation?.note || "");
   const [flagReason, setFlagReason] = useState(initialAnnotation?.flag_reason || "");
-  const [severity, setSeverity] = useState(initialAnnotation?.severity || "low");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -45,7 +48,6 @@ export default function AnnotationModal({
           corrected_intensity: correctedIntensity,
           note,
           flag_reason: flagReason,
-          severity,
         }),
       });
 
@@ -89,6 +91,15 @@ export default function AnnotationModal({
           value={correctedIntensity}
           onChange={(e) => setCorrectedIntensity(parseFloat(e.target.value))}
         />
+        <Input
+          label="Corrected Alignment With Goal Score (0.1 - 1.0)"
+          type="number"
+          min={0.1}
+          max={1}
+          step={0.1}
+          value={correctedAlignmentScore}
+          onChange={(e) => setCorrectedAlignmentScore(parseFloat(e.target.value))}
+        />
         <TextArea
           placeholder="Annotation Note"
           value={note}
@@ -99,17 +110,6 @@ export default function AnnotationModal({
           value={flagReason}
           onChange={(e) => setFlagReason(e.target.value)}
         />
-        <Select
-          options={[
-            { value: "low", label: "Low" },
-            { value: "medium", label: "Medium" },
-            { value: "high", label: "High" },
-          ]}
-          label="Severity"
-          value={severity}
-          onChange={(e) => setSeverity(e.target.value as "high" | "medium" | "low")}
-        />
-
         <div className="flex justify-end gap-2 pt-2">
           <button
             className="rounded bg-gray-200 px-4 py-1 text-sm"

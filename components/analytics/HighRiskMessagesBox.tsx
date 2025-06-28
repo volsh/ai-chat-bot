@@ -10,9 +10,7 @@ export default function HighRiskMessagesBox({
   rows: EmotionTrainingRow[];
   pageSize?: number;
 }) {
-  const highRisk = rows.filter(
-    (r) => r.severity === "high" || (r.tone === "negative" && r.intensity > 0.8)
-  );
+  const highRisk = rows.filter((r) => r.tone === "negative" && r.intensity > 0.8);
   const [page, setPage] = useState(0);
   const totalPages = Math.ceil(highRisk.length / pageSize);
   const currentRows = highRisk.slice(page * pageSize, (page + 1) * pageSize);
@@ -47,9 +45,7 @@ export default function HighRiskMessagesBox({
               </Link>
             )}
             <span>
-              {msg.severity === "high"
-                ? "Severe"
-                : `Tone: ${msg.tone}, Intensity: ${msg.intensity}`}
+              {`Emotion: ${msg.emotion}, Intensity: ${msg.intensity}`}
             </span>
           </div>
         </div>

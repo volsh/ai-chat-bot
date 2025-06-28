@@ -20,6 +20,9 @@ export interface FlaggedSession extends Session {
   top_reasons?: string[];
   folder_name?: string;
   ai_agreement_rate?: number; // 0–100 percent
-
+  treatment_title?: string;
+  goal_title?: string;
+  treatment_color: string;
+  treatment_emoji: string;
   flagged_messages: MessageWithEmotion[];
 }

@@ -1,3 +1,5 @@
+import { Goal } from "./Goal";
+
 export interface Treatment {
   id: string;
   title: string;
@@ -15,4 +17,8 @@ export interface Treatment {
   ended_at: string;
   summary: string;
   shared_with: string[];
+}
+
+export interface TreatmentWithGoal extends Treatment {
+  goals: Goal;
 }

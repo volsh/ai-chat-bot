@@ -4,12 +4,7 @@ import { sources } from "next/dist/compiled/webpack/webpack";
 /**
  * Call emotion tagging endpoint with user input.
  */
-export async function tagEmotion(
-  content: string,
-  source_id: string,
-  role: "user" | "assistant",
-  onOptimisticUpdate?: (emotion: any) => void
-) {
+export async function tagEmotion(source_id: string, onOptimisticUpdate?: (emotion: any) => void) {
   try {
     // Local optimistic estimate (optional: a placeholder emotion prediction)
     const optimisticEmotion = {
@@ -17,6 +12,7 @@ export async function tagEmotion(
       intensity: 1,
       tone: "Neutral",
       topic: "Unknown",
+      alignment_score: 0.0,
       source_id,
       created_at: new Date().toISOString(),
     };
@@ -24,7 +20,7 @@ export async function tagEmotion(
 
     const res = await fetch("/api/tag-emotion", {
       method: "POST",
-      body: JSON.stringify({ content, source_id, role }),
+      body: JSON.stringify({ source_id }),
       headers: { "Content-Type": "application/json" },
     });
 

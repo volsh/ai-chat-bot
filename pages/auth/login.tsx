@@ -71,7 +71,7 @@ export default function LoginPage() {
   const signInWithPassword = async () => {
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: "therapist1@example.com",
+      email: "therapist2@example.com",
       password: "Test123!",
     });
     if (error) {

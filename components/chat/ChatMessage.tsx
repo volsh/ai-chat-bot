@@ -52,7 +52,6 @@ export default function ChatMessage({
       setShowDetails(true);
     }
   }, [emotion, isTherapist]);
-
   return (
     <motion.div
       ref={messageRef}
@@ -61,13 +60,14 @@ export default function ChatMessage({
       exit={{ opacity: 0, y: 10 }}
       transition={{ duration: 0.3 }}
       className={clsx("group relative whitespace-pre-wrap rounded-lg px-3 py-2 text-sm", {
-        "bg-zinc-100 text-black dark:bg-zinc-800": msg.role === "user",
-        "bg-blue-100 text-blue-900 dark:bg-blue-800 dark:text-white": msg.role === "assistant",
-        "bg-zinc-200 text-zinc-800 dark:bg-zinc-700": msg.role === "system",
+        "bg-zinc-100 text-black dark:bg-zinc-800": msg.message_role === "user",
+        "bg-blue-100 text-blue-900 dark:bg-blue-800 dark:text-white":
+          msg.message_role === "assistant",
+        "bg-zinc-200 text-zinc-800 dark:bg-zinc-700": msg.message_role === "system",
       })}
     >
       <div className="flex justify-between gap-1 text-xs text-gray-500 dark:text-gray-100">
-        <span className="font-medium capitalize">{msg.role}</span>
+        <span className="font-medium capitalize">{msg.message_role}</span>
         <span className="flex flex-wrap items-center gap-2">
           {emotion && isTherapist && (
             <>
@@ -79,7 +79,9 @@ export default function ChatMessage({
                   ⚠️ Flagged
                 </div>
               )}
-              {emotion.severity && <SeverityBadge severity={emotion.severity} />}
+              {emotion.intensity && emotion.tone && (
+                <SeverityBadge intensity={emotion.intensity} tone={emotion.tone} />
+              )}
               <div
                 className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${getEmotionBadgeClass(emotion.tone!, emotion.intensity!)}`}
                 title={`Emotion: ${emotion.emotion}, Intensity: ${emotion.intensity}`}
@@ -110,9 +112,9 @@ export default function ChatMessage({
             className={clsx(
               "pointer-events-none absolute bottom-[-1px] left-0 right-0 h-12 bg-gradient-to-t to-transparent",
               {
-                "from-zinc-100 dark:from-zinc-800": msg.role === "user",
-                "from-blue-100 dark:from-blue-800": msg.role === "assistant",
-                "from-zinc-200 dark:from-zinc-700": msg.role === "system",
+                "from-zinc-100 dark:from-zinc-800": msg.message_role === "user",
+                "from-blue-100 dark:from-blue-800": msg.message_role === "assistant",
+                "from-zinc-200 dark:from-zinc-700": msg.message_role === "system",
               }
             )}
           />
@@ -136,7 +138,7 @@ export default function ChatMessage({
         📋
       </button>
       <div>
-        {msg.role === "assistant" && (
+        {msg.message_role === "assistant" && (
           <button
             onClick={regenerate}
             className="mr-1 mt-1 text-xs text-blue-500 underline"

@@ -1,20 +1,5 @@
 // utils/emotions/constants.ts
 
-export const emotions = ["anger", "joy", "sadness", "fear", "surprise", "disgust", "neutral"];
-
-export const tones = ["positive", "negative", "neutral", "hopeful", "anxious", "supportive"];
-
-export const topics = [
-  "relationships",
-  "work",
-  "health",
-  "identity",
-  "self-esteem",
-  "goals",
-  "anxiety",
-  "depression",
-];
-
 export const severityColors: Record<string, string> = {
   high: "text-red-600",
   medium: "text-yellow-600",

@@ -19,6 +19,8 @@ import { useShallow } from "zustand/react/shallow";
 import ChatMessage from "./ChatMessage";
 import saveMessageToDB from "@/utils/chat/saveMessageToDB";
 import startNewChat from "@/utils/chat/startNewChat";
+import Modal from "../ui/modal";
+import Spinner from "../ui/spinner";
 
 interface ChatBoxProps {
   initialSession?: Session;
@@ -26,7 +28,13 @@ interface ChatBoxProps {
 }
 
 export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MessageWithEmotion[]>([
+    {
+      role: "system",
+      content: "🆕 New session started. Ask me anything to begin.",
+      created_at: new Date().toISOString(),
+    } as MessageWithEmotion,
+  ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -41,6 +49,9 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   const [expandedSummary, setExpandedSummary] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [paused, setPaused] = useState(false);
 
   const { userProfile } = useAppStore(useShallow((s) => ({ userProfile: s.userProfile })));
   const userId = userProfile?.id;
@@ -55,7 +66,11 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   }, []);
 
   useEffect(() => {
-    if (initialSession?.summary) setSummary(initialSession.summary);
+    if (initialSession?.summary) {
+      setSummary(initialSession.summary);
+    } else {
+      setSummary("");
+    }
   }, [initialSession]);
 
   const fetchSession = useCallback(async () => {
@@ -72,7 +87,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
     if (!userId) return;
     if (sessionId) {
       loadSessionMessages(sessionId).then((msgs: MessageWithEmotion[]) => {
-        setMessages((msgs ?? []) as Message[]);
+        setMessages(msgs ?? []);
         const map = Object.fromEntries(
           msgs
             .filter((msg) => !!msg.emotion)
@@ -102,9 +117,12 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
 
   useEffect(() => {
     if (!session) return;
+
     const createdAt = new Date(session.created_at).getTime();
-    const now = Date.now();
-    const expiresAt = createdAt + 2 * 60 * 60 * 1000;
+    const pausedAt = session.paused_at ? new Date(session.paused_at).getTime() : null;
+    const totalPausedMs = (session.total_pause_seconds || 0) * 1000;
+    const durationMs = 2 * 60 * 60 * 1000;
+    const expiresAt = createdAt + durationMs + totalPausedMs;
 
     if (session.ended_at) {
       setIsExpired(true);
@@ -112,13 +130,15 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
       return;
     }
 
-    if (now >= expiresAt) {
-      setIsExpired(true);
+    if (pausedAt) {
+      const pausedCountdown = expiresAt - pausedAt;
+      setCountdown(pausedCountdown);
       return;
     }
 
     const interval = setInterval(() => {
-      const remaining = expiresAt - Date.now();
+      const now = Date.now();
+      const remaining = expiresAt - now;
       if (remaining <= 0) {
         clearInterval(interval);
         setIsExpired(true);
@@ -126,7 +146,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
 
         supabase
           .from("sessions")
-          .update({ ended_at: new Date().toISOString() }) // or use your preferred naming
+          .update({ ended_at: new Date().toISOString() })
           .eq("id", sessionId)
           .then(({ error }) => {
             if (error) {
@@ -154,21 +174,41 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
     if (saved !== null) setTagAssistantEnabled(saved === "true");
   }, []);
 
-  const generateMessageAndTagEmotion = async (messages: Message[]) => {
+  const handlePause = async () => {
+    setPaused(true);
+    await supabase
+      .from("sessions")
+      .update({ paused_at: new Date().toISOString() })
+      .eq("id", sessionId);
+    fetchSession();
+  };
+
+  const handleContinue = async () => {
+    if (!session?.paused_at) return;
+    setPaused(false);
+    const now = new Date();
+    const pausedAt = new Date(session.paused_at);
+    const diffSeconds = Math.floor((now.getTime() - pausedAt.getTime()) / 1000);
+    const newTotal = (session.total_pause_seconds || 0) + diffSeconds;
+
+    await supabase
+      .from("sessions")
+      .update({ paused_at: null, total_pause_seconds: newTotal })
+      .eq("id", sessionId);
+
+    fetchSession();
+  };
+
+  const generateMessageAndTagEmotion = async (messages: MessageWithEmotion[]) => {
     try {
-      const response = await sendChatMessage(sessionId!, messages);
+      const response = await sendChatMessage(messages);
       const assistantMessage = await saveMessageToDB(sessionId!, response.message);
       setMessages([...messages, assistantMessage]);
       if (tagAssistantEnabled) {
         try {
-          const result = await tagEmotion(
-            response.message.content,
-            assistantMessage.id!,
-            "assistant",
-            (optimistic) => {
-              setEmotionLogs((prev) => ({ ...prev, [assistantMessage.id!]: optimistic }));
-            }
-          );
+          const result = await tagEmotion(assistantMessage.id!, (optimistic) => {
+            setEmotionLogs((prev) => ({ ...prev, [assistantMessage.id!]: optimistic }));
+          });
           if (result?.emotion) {
             setEmotionLogs((prev) => ({ ...prev, [assistantMessage.id!]: result }));
           }
@@ -177,7 +217,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
         }
       }
     } catch {
-      toast.error("Failed to regenerate message");
+      toast.error("Failed to generate message");
     }
   };
 
@@ -222,18 +262,13 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
       onRefresh?.();
     }
 
-    let userMessageWithId: Message;
+    let userMessageWithId: MessageWithEmotion;
     try {
       userMessageWithId = await saveMessageToDB(sessionId!, rawMessage);
       setMessages((prev) => [...prev, userMessageWithId]);
-      const result = await tagEmotion(
-        userMessageWithId.content,
-        userMessageWithId.id!,
-        "user",
-        (optimistic) => {
-          setEmotionLogs((prev) => ({ ...prev, [userMessageWithId.id!]: optimistic }));
-        }
-      );
+      const result = await tagEmotion(userMessageWithId.id!, (optimistic) => {
+        setEmotionLogs((prev) => ({ ...prev, [userMessageWithId.id!]: optimistic }));
+      });
       if (result?.emotion) {
         setEmotionLogs((prev) => ({ ...prev, [userMessageWithId.id!]: result }));
       }
@@ -266,6 +301,21 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
     const trimmed = messages.slice(0, index);
     await generateMessageAndTagEmotion(trimmed);
     setLoading(false);
+  };
+
+  const handleFinishChat = async () => {
+    setIsFinishing(true);
+    const { error } = await supabase
+      .from("sessions")
+      .update({ ended_at: new Date() })
+      .eq("id", sessionId);
+    if (error) {
+      toast.error("Failed to end chat. Please try again later");
+    }
+    fetchSession();
+    onRefresh?.();
+    setIsFinishing(false);
+    setIsFinishModalOpen(false);
   };
 
   if (!userId) {
@@ -403,67 +453,85 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
         )}
         {!isTherapist && (
           <>
-            <input
-              ref={inputRef}
-              className="flex-1 rounded-md border p-2 dark:bg-zinc-800 dark:text-white"
-              placeholder="Ask something…"
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                setTyping(true);
-                if (typingTimeout.current) clearTimeout(typingTimeout.current);
-                typingTimeout.current = setTimeout(() => setTyping(false), 1200);
-              }}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-              disabled={!sessionId || isExpired}
-              aria-label="chat input"
-            />
-            <button
-              onClick={send}
-              className="rounded-md bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
-              disabled={!sessionId || loading || isExpired}
-            >
-              Send
-            </button>
-            <button
-              onClick={() => startNewChat(session?.treatment_id!)}
-              className="rounded bg-gray-200 px-3 py-1 text-sm text-zinc-700 shadow disabled:opacity-50 dark:bg-zinc-700 dark:text-white"
-              disabled={!session}
-            >
-              ➕ New Chat
-            </button>
-            <button
-              onClick={() => {
-                const next = !tagAssistantEnabled;
-                setTagAssistantEnabled(next);
-                localStorage.setItem("tagAssistantEnabled", String(next));
-              }}
-              className="text-sm text-gray-600 underline dark:text-gray-300"
-            >
-              {tagAssistantEnabled ? "🔴 Disable Assistant Tagging" : "🟢 Enable Assistant Tagging"}
-            </button>
-            <button
-              onClick={async () => {
-                await supabase
-                  .from("sessions")
-                  .update({ ended_at: new Date() })
-                  .eq("id", sessionId);
-                fetchSession();
-                onRefresh?.();
-              }}
-              className="mt-4 rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 disabled:opacity-50"
-              disabled={!sessionId || isExpired}
-            >
-              Finish Chat
-            </button>
+            <div className="flex gap-2">
+              <input
+                ref={inputRef}
+                className="flex-1 rounded-md border p-2 disabled:opacity-50 dark:bg-zinc-800 dark:text-white"
+                placeholder="Ask something…"
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  setTyping(true);
+                  if (typingTimeout.current) clearTimeout(typingTimeout.current);
+                  typingTimeout.current = setTimeout(() => setTyping(false), 1200);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && send()}
+                disabled={!sessionId || isExpired || paused}
+                aria-label="chat input"
+              />
+              <button
+                onClick={send}
+                className="rounded-md bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+                disabled={!sessionId || loading || isExpired || paused}
+              >
+                Send
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const next = !tagAssistantEnabled;
+                  setTagAssistantEnabled(next);
+                  localStorage.setItem("tagAssistantEnabled", String(next));
+                }}
+                className="text-sm text-gray-600 underline dark:text-gray-300"
+              >
+                {tagAssistantEnabled
+                  ? "🔴 Disable Assistant Tagging"
+                  : "🟢 Enable Assistant Tagging"}
+              </button>
+              <button
+                onClick={() => exportChatToPDF("My Chat", messages)}
+                className="text-sm text-zinc-700 underline dark:text-white"
+              >
+                📄 Export
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => startNewChat(session?.treatment_id!)}
+                className="rounded bg-gray-200 px-3 py-1 text-sm text-zinc-700 shadow disabled:opacity-50 dark:bg-zinc-700 dark:text-white"
+                disabled={!session}
+              >
+                ➕ New Chat
+              </button>
+              {session?.paused_at ? (
+                <button
+                  onClick={handleContinue}
+                  className="rounded bg-yellow-500 px-4 py-2 text-sm text-white hover:bg-yellow-600 disabled:opacity-50"
+                  disabled={!sessionId || isExpired}
+                >
+                  ▶️ Play
+                </button>
+              ) : (
+                <button
+                  onClick={handlePause}
+                  className="rounded bg-yellow-500 px-4 py-2 text-sm text-white hover:bg-yellow-600 disabled:opacity-50"
+                  disabled={!sessionId || isExpired}
+                >
+                  ⏸️ Pause
+                </button>
+              )}
+              <button
+                onClick={() => setIsFinishModalOpen(true)}
+                className="rounded bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 disabled:opacity-50"
+                disabled={!sessionId || isExpired}
+              >
+                Finish Chat
+              </button>
+            </div>
           </>
         )}
-        <button
-          onClick={() => exportChatToPDF("My Chat", messages)}
-          className="text-sm text-zinc-700 underline dark:text-white"
-        >
-          📄 Export
-        </button>
       </div>
 
       {othersTyping.length > 0 && (
@@ -479,6 +547,29 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
             </div>
           ))}
         </div>
+      )}
+      {isFinishModalOpen && (
+        <Modal onClose={() => setIsFinishModalOpen(false)}>
+          <>
+            <h3 className="text-xl font-semibold text-red-600">Are you sure?</h3>
+            <p className="text-sm text-zinc-500">This action will permanently end the session.</p>
+            {isFinishing && <Spinner />}
+            <div className="mt-4 flex justify-between gap-4">
+              <button
+                onClick={() => setIsFinishModalOpen(false)}
+                className="w-1/2 rounded bg-gray-600 py-2 text-white hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleFinishChat}
+                className="w-1/2 rounded bg-red-600 py-2 text-white hover:bg-red-700"
+              >
+                Finish
+              </button>
+            </div>
+          </>
+        </Modal>
       )}
     </div>
   );

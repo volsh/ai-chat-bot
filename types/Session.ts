@@ -1,9 +1,13 @@
+import { TreatmentWithGoal } from "./Treatment";
+
 export interface Session {
   id: string;
   user_id: string;
   title: string;
   created_at: string;
   ended_at: string;
+  paused_at: string;
+  total_pause_seconds: number;
   goal: string;
   emoji: string;
   color: string;
@@ -12,4 +16,8 @@ export interface Session {
   summary?: string;
   bookmarked?: boolean;
   treatment_id: string;
+}
+
+export interface SessionWithGoal extends Session {
+  treatments: TreatmentWithGoal;
 }

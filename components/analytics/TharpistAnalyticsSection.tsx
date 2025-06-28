@@ -84,12 +84,7 @@ export default function TharpistAnalyticsSection() {
     );
   }, [allRows]);
 
-  if (loading)
-    return (
-      <div className="mt-8 text-center">
-        <Spinner size={50} />
-      </div>
-    );
+  if (loading) return <Spinner size={50} className="mt-8" />;
 
   return (
     <div className="mt-8">

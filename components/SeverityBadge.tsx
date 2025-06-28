@@ -1,10 +1,10 @@
-// components/SeverityBadge.tsx
 import clsx from "clsx";
 import React from "react";
+import { getSeverityFromEmotion } from "@/utils/emotions/getSeverityFromEmotion";
 
-export type Severity = "low" | "medium" | "high";
+export function SeverityBadge({ intensity, tone }: { intensity: number; tone: string }) {
+  const severity = getSeverityFromEmotion(intensity, tone);
 
-export function SeverityBadge({ severity }: { severity: Severity }) {
   const color =
     severity === "high"
       ? "bg-red-600 text-white"

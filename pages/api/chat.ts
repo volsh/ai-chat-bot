@@ -1,12 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { openai } from "@/utils/ai/client";
+import { MessageWithEmotion } from "@/types";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { messages } = await req.body;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
-    messages,
+    messages: messages.map((m: MessageWithEmotion) => ({
+      content: m.content,
+      role: m.message_role || m.role,
+    })),
   });
   try {
     res.status(200).json({ message: completion.choices[0].message });

@@ -3,4 +3,5 @@ export interface Emotion {
   intensity: number;
   tone: string;
   topic: string;
+  alignment_score: number;
 }

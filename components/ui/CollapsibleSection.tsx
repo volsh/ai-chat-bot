@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 
 interface CollapsibleSectionProps {
-  title: string;
+  title: string | React.ReactNode;
   icon?: React.ReactNode;
   actions?: React.ReactNode;
   defaultOpen?: boolean;

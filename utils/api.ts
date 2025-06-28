@@ -1,11 +1,11 @@
-import { Message } from "@/types";
+import { Message, MessageWithEmotion } from "@/types";
 
-export async function sendChatMessage(sessionId: string, messagesOverride?: Message[]) {
+export async function sendChatMessage(messagesOverride?: MessageWithEmotion[]) {
   const messagesToSend = messagesOverride ?? [];
 
   const res = await fetch("/api/chat", {
     method: "POST",
-    body: JSON.stringify({ session_id: sessionId, messages: messagesToSend }),
+    body: JSON.stringify({ messages: messagesToSend }),
     headers: { "Content-Type": "application/json" },
   });
 

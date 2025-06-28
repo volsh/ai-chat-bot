@@ -5,12 +5,12 @@ import { annotateMessage } from "@/utils/ai/annotateMessage";
 
 const schema = z.object({
   source_type: z.string().optional(),
-  source_id: z.string().optional(),
+  source_id: z.string(),
   corrected_emotion: z.string().optional(),
   corrected_tone: z.string().optional(),
   corrected_topic: z.string().optional(),
   corrected_intensity: z.number().optional(),
-  severity: z.union([z.literal("high"), z.literal("medium"), z.literal("low")]),
+  corrected_alignment_score: z.number().optional(),
   note: z.string().optional(),
   flag_reason: z.string().optional(),
 });
@@ -38,9 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     corrected_tone,
     corrected_topic,
     corrected_intensity,
+    corrected_alignment_score,
     note,
     flag_reason,
-    severity,
   } = parsed.data;
 
   try {
@@ -48,12 +48,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       supabase,
       source_id,
       source_type: "session", // for now
-      therapist_id: user.id,
+      updated_by: user.id,
       corrected_emotion,
       corrected_tone,
       corrected_topic,
       corrected_intensity,
-      severity,
+      corrected_alignment_score,
       flag_reason,
       note,
     });

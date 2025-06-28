@@ -9,7 +9,7 @@ interface ToggleProps {
 
 export default function Toggle({ label, checked, onChange }: ToggleProps) {
   return (
-    <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200">
+    <label className="mt-1 flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200">
       <input
         type="checkbox"
         className="toggle toggle-primary"

@@ -107,6 +107,7 @@ export default function ExportPreviewModal({
                     {entry.tone && <Badge>{entry.tone}</Badge>}
                     {entry.intensity && <Badge>{entry.intensity}</Badge>}
                     {entry.topic && <Badge>{entry.topic}</Badge>}
+                    {entry.alignment_score && <Badge>{entry.alignment_score}</Badge>}
                     {entry.score !== undefined && (
                       <Badge variant="outline">Score: {entry.score.toFixed(2)}</Badge>
                     )}

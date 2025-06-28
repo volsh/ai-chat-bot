@@ -22,12 +22,15 @@ export async function buildFilteredTrainingQuery(
   if (filters.topics?.length) query = query.in("topic", filters.topics);
   if (filters.intensity) query = query.gte("intensity", filters.intensity[0]);
   if (filters.intensity) query = query.lte("intensity", filters.intensity[1]);
+  if (filters.alignment_score) query = query.gte("alignment_score", filters.alignment_score[0]);
+  if (filters.alignment_score) query = query.lte("alignment_score", filters.alignment_score[1]);
 
   if (filters.includeCorrected)
     query = query.gte("annotation_updated_at", latestSnapshot?.created_at);
   if (filters.correctedBy) query = query.eq("annotation_updated_by", filters.correctedBy);
-  if (filters.highRiskOnly)
-    query = query.eq("severity", "high").or("tone.eq.negative,intensity.gte.0.8");
+  if (filters.highRiskOnly) {
+    query = query.eq("tone", "negative").gte("intensity", 0.8);
+  }
   if (filters.startDate) query = query.gte("tagged_at", filters.startDate);
   if (filters.endDate) query = query.lte("tagged_at", filters.endDate);
   if (filters.scoreCutoff !== undefined) query = query.gte("score", filters.scoreCutoff);

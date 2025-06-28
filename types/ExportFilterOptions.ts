@@ -5,6 +5,7 @@ export type ExportFilterOptions = {
   tones?: string[];
   topics?: string[];
   intensity?: [number, number];
+  alignment_score?: [number, number];
   sourceTypes?: string[];
   includeCorrected?: boolean;
   correctedBy?: string;
@@ -19,4 +20,5 @@ export type ExportFilterOptions = {
   flaggedOnly?: boolean;
   flagReasons?: string[];
   agreement?: [number, number];
+  goals?: string[];
 };
