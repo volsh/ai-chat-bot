@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 
 export default function EmotionDistributionPie({ rows }: { rows: EmotionTrainingRow[] }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(rows.length > 0);
 
   const emotionCount = useMemo(
     () =>
@@ -32,6 +32,11 @@ export default function EmotionDistributionPie({ rows }: { rows: EmotionTraining
       {loading && (
         <div className="flex h-[400px] items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-gray-500" />
+        </div>
+      )}
+      {!loading && emotionData.length === 0 && (
+        <div className="flex h-[300px] items-center justify-center text-sm text-gray-500">
+          No data available.
         </div>
       )}
       <ResponsiveContainer height={300}>

@@ -40,7 +40,6 @@ export default function ExportTrainingScreen() {
     filePath,
     exportLocked,
     previewRows,
-    cutoff,
     totalCount,
     totalAnnotations,
     selectedCount,
@@ -96,6 +95,61 @@ export default function ExportTrainingScreen() {
               setFilters((f) => ({ ...f, intensity: [value[0], value[1]] }))
             }
           />
+          <Slider
+            type="range"
+            label="Alignment with goal score"
+            min={0.1}
+            max={1}
+            step={0.1}
+            value={[filters.alignment_score?.[0] || 0.1, filters.alignment_score?.[1] || 1]}
+            onChange={(value: [number, number]) =>
+              setFilters((f) => ({ ...f, alignment_score: [value[0], value[1]] }))
+            }
+          />
+          <Slider
+            label="Score Cutoff Threshold"
+            min={1}
+            max={5}
+            step={1}
+            value={filters.scoreCutoff || 3}
+            onChange={(value) => setFilters((f) => ({ ...f, scoreCutoff: value }))}
+            tooltip={
+              <>
+                Only include entries with a score equal to or above this value.
+                <ul className="mt-1 list-disc pl-5">
+                  <li>
+                    <strong>5</strong> – Manually corrected, or alignment with goal ≥{" "}
+                    <code>0.9</code> and intensity ≥ <code>0.8</code>
+                  </li>
+                  <li>
+                    <strong>4</strong> – Alignment with goal ≥ <code>0.9</code> and intensity ≥{" "}
+                    <code>0.4</code>, or alignment with goal ≥ <code>0.7</code> and intensity ≥{" "}
+                    <code>0.8</code>
+                  </li>
+                  <li>
+                    <strong>3</strong> – Alignment with goal ≥ <code>0.6</code> and intensity ≥{" "}
+                    <code>0.6</code>
+                  </li>
+                  <li>
+                    <strong>2</strong> – Alignment with goal ≥ <code>0.4</code> and intensity ≥{" "}
+                    <code>0.4</code>, or alignment with goal ≥ <code>0.2</code> or intensity ≥{" "}
+                    <code>0.2</code>
+                  </li>
+                  <li>
+                    <strong>1</strong> – Everything else (very weak signals)
+                  </li>
+                </ul>
+              </>
+            }
+            tooltipId="scoreCutoffTooltip"
+          />
+          <Slider
+            label="Top N Annotations"
+            min={1}
+            max={totalAnnotations || 100}
+            value={filters.topN || 50}
+            onChange={(value) => setFilters((f) => ({ ...f, topN: value }))}
+          />
           <MultiSelectFilter
             label="Role"
             options={["user", "assistant"]}
@@ -103,7 +157,7 @@ export default function ExportTrainingScreen() {
             onChange={(selected) => setFilters((f) => ({ ...f, messageRole: selected }))}
           />
           <MultiSelectFilter
-            label="User"
+            label="Client"
             values={filters.users || []}
             onChange={(selected) => setFilters((f) => ({ ...f, users: selected }))}
             options={Array.from(
@@ -116,14 +170,14 @@ export default function ExportTrainingScreen() {
             )}
           />
           <MultiSelectFilter
-            label="Therapist"
-            values={filters.therapists || []}
-            onChange={(selected) => setFilters((f) => ({ ...f, therapists: selected }))}
+            label="Reviewed by"
+            values={filters.reviewedBy || []}
+            onChange={(selected) => setFilters((f) => ({ ...f, reviewedBy: selected }))}
             options={Array.from(
               new Map(
                 previewRows.map((s) => [
-                  s.annotation_updated_by,
-                  { value: s.user_id, label: s.therapist_name } as OptionType,
+                  s.reviewed_by,
+                  { value: s.reviewed_by, label: s.reviewed_by_name } as OptionType,
                 ])
               ).values()
             )}
@@ -140,45 +194,6 @@ export default function ExportTrainingScreen() {
               onChange={(checked) => setFilters((f) => ({ ...f, highRiskOnly: checked }))}
             />
           </div>
-          <Slider
-            label="Top N Annotations"
-            min={1}
-            max={totalAnnotations || 100}
-            value={filters.topN || 50}
-            onChange={(value) => setFilters((f) => ({ ...f, topN: value }))}
-          />
-
-          <Slider
-            label="Score Cutoff Threshold"
-            min={1}
-            max={5}
-            step={1}
-            value={filters.scoreCutoff || 3}
-            onChange={(value) => setFilters((f) => ({ ...f, scoreCutoff: value }))}
-            tooltip={
-              <>
-                Only include entries with a score equal to or above this value.
-                <ul className="mt-1 list-disc pl-5">
-                  <li>
-                    <strong>5</strong> – Manually corrected
-                  </li>
-                  <li>
-                    <strong>4</strong> – High intensity (≥ 0.85)
-                  </li>
-                  <li>
-                    <strong>3</strong> – Moderate intensity (≥ 0.6)
-                  </li>
-                  <li>
-                    <strong>2</strong> – Low intensity (≥ 0.3)
-                  </li>
-                  <li>
-                    <strong>1</strong> – Very low intensity (&lt; 0.3)
-                  </li>
-                </ul>
-              </>
-            }
-            tooltipId="scoreCutoffTooltip"
-          />
         </div>
       )}
       <div className="mt-5 flex justify-between">
@@ -235,7 +250,7 @@ export default function ExportTrainingScreen() {
       {showPreview && (
         <ExportPreviewModal
           entries={previewRows}
-          cutoff={cutoff}
+          cutoff={filters.scoreCutoff}
           total={totalCount}
           onClose={() => setShowPreview(false)}
         />

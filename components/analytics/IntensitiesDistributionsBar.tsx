@@ -5,7 +5,7 @@ import CustomLegend from "./CustomLegend";
 import CustomBarTooltip from "./CustomBarTooltip";
 
 export default function IntensitiesDistributionsBar({ rows }: { rows: EmotionTrainingRow[] }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(rows.length > 0);
 
   const uniqueDates = useMemo(() => {
     return Array.from(
@@ -51,6 +51,11 @@ export default function IntensitiesDistributionsBar({ rows }: { rows: EmotionTra
       {loading && (
         <div className="absolute left-1/2 top-1/2 flex h-[400px] -translate-y-1/2 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-gray-500" />
+        </div>
+      )}
+      {rows.length === 0 && (
+        <div className="flex h-[300px] items-center justify-center text-sm text-gray-500">
+          No data available.
         </div>
       )}
       <ResponsiveContainer height={400}>

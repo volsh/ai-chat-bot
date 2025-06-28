@@ -50,7 +50,7 @@ export default function IntensityOverTimeLine({ rows }: { rows: EmotionTrainingR
   }, [rows, rows]);
 
   return (
-    <div className="rounded border p-4">
+    <div className="relative rounded border p-4">
       <h4 className="flex items-center gap-2 font-semibold">
         Avg Intensity for Emotion Over Time
         <span
@@ -60,6 +60,11 @@ export default function IntensityOverTimeLine({ rows }: { rows: EmotionTrainingR
           📊
         </span>
       </h4>
+      {rows.length === 0 && (
+        <div className="flex h-[300px] items-center justify-center text-sm text-gray-500">
+          No data available.
+        </div>
+      )}
       <ResponsiveContainer height={400}>
         <LineChart data={lineChartData} margin={{ top: 20, right: 60, left: 40, bottom: 30 }}>
           <XAxis dataKey="date" />

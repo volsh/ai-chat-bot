@@ -15,19 +15,31 @@ export async function buildFilteredTrainingQuery(
     .single();
 
   if (filters.users?.length) query = query.in("user_id", filters.users);
-  if (filters.therapists?.length) query = query.in("therapist_id", filters.therapists);
+  if (filters.reviewedBy?.length) query = query.in("reviewed_by", filters.reviewedBy);
+  if (filters.supportingTherapists?.length) {
+    query = query.filter("supporting_therapist", "overlaps", filters.supportingTherapists);
+  }
+
   if (filters.sourceTypes?.length) query = query.in("source_type", filters.sourceTypes);
   if (filters.emotions?.length) query = query.in("emotion", filters.emotions);
   if (filters.tones?.length) query = query.in("tone", filters.tones);
   if (filters.topics?.length) query = query.in("topic", filters.topics);
-  if (filters.intensity) query = query.gte("intensity", filters.intensity[0]);
-  if (filters.intensity) query = query.lte("intensity", filters.intensity[1]);
-  if (filters.alignment_score) query = query.gte("alignment_score", filters.alignment_score[0]);
-  if (filters.alignment_score) query = query.lte("alignment_score", filters.alignment_score[1]);
+  if (filters.intensity !== undefined && (filters.intensity[0] > 0.1 || filters.intensity[1] < 1)) {
+    if (filters.intensity) query = query.gte("intensity", filters.intensity[0]);
+    if (filters.intensity) query = query.lte("intensity", filters.intensity[1]);
+  }
+  if (
+    filters.alignment_score !== undefined &&
+    (filters.alignment_score[0] > 0.1 || filters.alignment_score[1] < 1)
+  ) {
+    if (filters.alignment_score !== undefined)
+      query = query.gte("alignment_score", filters.alignment_score[0]);
+    if (filters.alignment_score !== undefined)
+      query = query.lte("alignment_score", filters.alignment_score[1]);
+  }
 
   if (filters.includeCorrected)
     query = query.gte("annotation_updated_at", latestSnapshot?.created_at);
-  if (filters.correctedBy) query = query.eq("annotation_updated_by", filters.correctedBy);
   if (filters.highRiskOnly) {
     query = query.eq("tone", "negative").gte("intensity", 0.8);
   }

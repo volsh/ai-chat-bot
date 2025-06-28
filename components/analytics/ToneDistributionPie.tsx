@@ -5,7 +5,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 const TONE_COLORS = ["#8e44ad", "#2980b9", "#2ecc71", "#f39c12", "#c0392b", "#d35400", "#16a085"];
 
 export default function ToneDistributionPie({ rows }: { rows: EmotionTrainingRow[] }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(rows.length > 0);
 
   const toneCounts = useMemo(
     () =>
@@ -27,6 +27,11 @@ export default function ToneDistributionPie({ rows }: { rows: EmotionTrainingRow
       {loading && (
         <div className="flex h-[400px] items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-gray-500" />
+        </div>
+      )}
+      {!loading && toneData.length === 0 && (
+        <div className="flex h-[300px] items-center justify-center text-sm text-gray-500">
+          No data available.
         </div>
       )}
       <ResponsiveContainer height={300}>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { supabaseBrowserClient as supabase } from "@/libs/supabase"; // Assuming supabase client is used
 import { EmotionSummary, EmotionTrainingRow, ExportFilterOptions } from "@/types";
@@ -14,10 +14,9 @@ export function useExportTraining(
   const [previewRows, setPreviewRows] = useState<EmotionTrainingRow[]>([]);
   const [totalAnnotations, setTotalAnnotations] = useState(0);
   const [selectedCount, setSelectedCount] = useState(0);
-  const [cutoff, setCutoff] = useState<number>(3);
   const [totalCount, setTotalCount] = useState<number>(0);
 
-  const fetchPreview = async () => {
+  const fetchPreview = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/exports/export-fine-tune-preview", {
       method: "POST",
@@ -29,17 +28,16 @@ export function useExportTraining(
       setTotalAnnotations(json.total);
       setSelectedCount(json.annotations.length);
       setPreviewRows(json.annotations);
-      setCutoff(filters?.scoreCutoff || 3); // Update cutoff from the filters
-      setTotalCount(json.total); // Update total count
+      setTotalCount(json.total);
     } else {
       toast.error(json.error || "Failed to load preview");
     }
     setLoading(false);
-  };
+  }, [filters]);
 
   useEffect(() => {
     fetchPreview();
-  }, [filters]);
+  }, [fetchPreview]);
 
   const handleExport = async () => {
     setLoading(true);
@@ -73,7 +71,6 @@ export function useExportTraining(
     previewRows,
     totalAnnotations,
     selectedCount,
-    cutoff,
     totalCount,
     fetchPreview,
     handleExport,

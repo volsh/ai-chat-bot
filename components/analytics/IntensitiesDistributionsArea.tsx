@@ -4,7 +4,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import CustomLegend from "./CustomLegend";
 
 export default function IntensitiesDistributionsArea({ rows }: { rows: EmotionTrainingRow[] }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(rows.length > 0);
 
   const uniqueDates = useMemo(() => {
     return Array.from(
@@ -33,18 +33,18 @@ export default function IntensitiesDistributionsArea({ rows }: { rows: EmotionTr
   return (
     <div className="relative rounded border p-4">
       <h4 className="font-semibold">Avg Intensities Distributions for Tones by Date</h4>
-      {/* {loading && (
-        <div className="flex h-[400px] items-center justify-center">
+      {loading && (
+        <div className="absolute left-1/2 top-1/2 flex h-[400px] -translate-y-1/2 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-gray-500" />
         </div>
-      )} */}
+      )}
+      {rows.length === 0 && (
+        <div className="flex h-[300px] items-center justify-center text-sm text-gray-500">
+          No data available.
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={400}>
         <AreaChart data={mergedAreaData}>
-          {loading && (
-            <div className="absolute left-1/2 top-1/2 flex h-[400px] -translate-y-1/2 items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-gray-500" />
-            </div>
-          )}
           <XAxis dataKey="date" />
           <YAxis domain={[0, "auto"]} />
           <Tooltip />

@@ -7,7 +7,7 @@ import { useSavedFilters } from "@/hooks/useSavedFilters";
 import { ExportFilterOptions, FlaggedSession, MessageWithEmotion } from "@/types";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
-import MultiSelectFilter from "@/components/ui/multiSelectChips";
+import MultiSelectFilter, { OptionType } from "@/components/ui/multiSelectChips";
 import DateRangePicker from "@/components/ui/dateRangePicker";
 import SessionCard from "@/components/therapist/SessionCard";
 import Tabs from "@/components/ui/tabs";
@@ -32,10 +32,6 @@ export default function TherapistReviewPanel() {
   const [showAnnotations, setShowAnnotations] = useState(false);
   const [selectedMsg, setSelectedMsg] = useState<MessageWithEmotion | null>(null);
   const [showTopBtn, setShowTopBtn] = useState(false);
-  const [collapsedTreatments, setCollapsedTreatments] = useState<Record<string, boolean>>({});
-
-  const toggleTreatment = (tid: string) =>
-    setCollapsedTreatments((prev) => ({ ...prev, [tid]: !prev[tid] }));
 
   const { filters, setFilter, resetFilters } = useSavedFilters<ExportFilterOptions>(
     "therapist_sessions_view_filters",
@@ -51,6 +47,7 @@ export default function TherapistReviewPanel() {
       flaggedOnly: false,
       messageRole: [],
       goals: [],
+      users: [],
     }
   );
 
@@ -95,6 +92,7 @@ export default function TherapistReviewPanel() {
         (!filters.flagReasons?.length ||
           (s.top_reasons || []).some((r) => filters.flagReasons?.includes(r))) &&
         (!filters.goals?.length || filters.goals.includes(s.goal_title || "")) &&
+        (!filters.users?.length || filters.users.includes(s.client_id || "")) &&
         (!filters.agreement ||
           ((s.ai_agreement_rate ?? 0) >= filters.agreement[0] &&
             (s.ai_agreement_rate ?? 0) <= filters.agreement[1])) &&
@@ -214,12 +212,6 @@ export default function TherapistReviewPanel() {
             onChange={(e) => setQuery(e.target.value)}
           />
           <MultiSelectFilter
-            label="Role"
-            values={filters.messageRole || []}
-            onChange={(v) => setFilter("messageRole", v)}
-            options={["user", "assistant", "system"]}
-          />
-          <MultiSelectFilter
             label="Emotion"
             values={filters.emotions || []}
             onChange={(v) => setFilter("emotions", v)}
@@ -243,6 +235,23 @@ export default function TherapistReviewPanel() {
             step={0.1}
             value={[filters.intensity?.[0], filters.intensity?.[1]] as [number, number]}
             onChange={(v) => setFilter("intensity", v)}
+          />
+          <Slider
+            type="range"
+            label="Alignment with goal score"
+            min={0.1}
+            max={1}
+            step={0.1}
+            value={[filters.alignment_score?.[0] || 0.1, filters.alignment_score?.[1] || 1]}
+            onChange={(v) => setFilter("alignment_score", v)}
+          />
+          <Slider
+            type="range"
+            label="Min Agreement %"
+            min={0}
+            max={100}
+            value={[filters.agreement?.[0], filters.agreement?.[1]] as [number, number]}
+            onChange={(v) => setFilter("agreement", v)}
           />
           <Toggle
             label={
@@ -276,14 +285,24 @@ export default function TherapistReviewPanel() {
             onChange={(v) => setFilter("goals", v)}
             options={[...new Set(sessions.flatMap((s) => s.goal_title || "").filter(Boolean))]}
           />
-
-          <Slider
-            type="range"
-            label="Min Agreement %"
-            min={0}
-            max={100}
-            value={[filters.agreement?.[0], filters.agreement?.[1]] as [number, number]}
-            onChange={(v) => setFilter("agreement", v)}
+          <MultiSelectFilter
+            label="Role"
+            values={filters.messageRole || []}
+            onChange={(v) => setFilter("messageRole", v)}
+            options={["user", "assistant", "system"]}
+          />
+          <MultiSelectFilter
+            label="Client"
+            values={filters.users || []}
+            onChange={(v) => setFilter("users", v)}
+            options={Array.from(
+              new Map(
+                sessions.map((s) => [
+                  s.client_id,
+                  { value: s.client_id, label: s.client_name } as OptionType,
+                ])
+              ).values()
+            )}
           />
           <DateRangePicker
             value={{ from: filters.startDate!, to: filters.endDate! }}
@@ -317,7 +336,10 @@ export default function TherapistReviewPanel() {
 
               await Promise.all(
                 selectedIds.map((id) =>
-                  supabase.from("sessions").update({ reviewed: true }).eq("id", id)
+                  supabase
+                    .from("sessions")
+                    .update({ reviewed: true, reviewed_by: userProfile?.id })
+                    .eq("id", id)
                 )
               );
 

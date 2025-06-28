@@ -6,6 +6,7 @@ export interface FlaggedSession extends Session {
   session_title: string;
   session_created_at: string;
   client_email: string;
+  client_id: string;
   client_name: string;
   annotation_count: number;
   flagged_count: number;

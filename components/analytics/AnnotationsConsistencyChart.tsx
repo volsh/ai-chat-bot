@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 export function AnnotationsConsistencyChart({ rows }: { rows: EmotionTrainingRow[] }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(rows.length > 0);
 
   const data = useMemo(() => {
     if (!rows.length) return [];
@@ -36,8 +36,6 @@ export function AnnotationsConsistencyChart({ rows }: { rows: EmotionTrainingRow
     });
   }, [rows]);
 
-  if (!data.length) return <div>No annotation data available</div>;
-
   return (
     <div className="relative rounded border p-4">
       <h4 className="flex items-center gap-2 font-semibold">
@@ -52,6 +50,11 @@ export function AnnotationsConsistencyChart({ rows }: { rows: EmotionTrainingRow
       {loading && (
         <div className="absolute left-1/2 top-1/2 flex h-[400px] -translate-y-1/2 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-gray-500" />
+        </div>
+      )}
+      {rows.length === 0 && (
+        <div className="flex h-[300px] items-center justify-center text-sm text-gray-500">
+          No data available.
         </div>
       )}
       <ResponsiveContainer height={300}>

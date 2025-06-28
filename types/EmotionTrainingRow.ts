@@ -18,11 +18,16 @@ export type EmotionTrainingRow = {
   note: string | null;
   annotation_updated_at: string | null;
   annotation_updated_by: string | null;
-  therapist_name: string | null;
+  annotation_updated_by_name: string | null;
   tagged_at: string;
   score: number;
   flagged: boolean;
   flag_reason: string;
   goal: string;
   alignment_score: number;
+  reviewed: boolean;
+  reviewed_by: string;
+  reviewed_by_name: string;
+  supporting_therapists: { id: string; name: string }[];
+  message_created_at: string;
 };

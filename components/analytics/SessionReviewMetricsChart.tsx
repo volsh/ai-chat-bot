@@ -20,7 +20,7 @@ export function SessionReviewMetricsChart({
   rows: EmotionTrainingRow[];
   pageSize: number;
 }) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(rows.length > 0);
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredLabel, setHoveredLabel] = useState<{ title: string; x: number; y: number } | null>(
@@ -75,10 +75,6 @@ export function SessionReviewMetricsChart({
     );
   }, [data, searchQuery]);
 
-  if (!filteredData.length) {
-    return <div className="text-gray-500">No review data available for these rows.</div>;
-  }
-
   const totalPages = Math.ceil(filteredData.length / pageSize);
   const pageData = filteredData.slice(page * pageSize, (page + 1) * pageSize);
   const trendData = pageData.map((d, i) => ({
@@ -100,110 +96,115 @@ export function SessionReviewMetricsChart({
           📊
         </span>
       </h4>
-
       {loading && (
         <div className="absolute left-1/2 top-1/2 flex h-[300px] -translate-y-1/2 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-gray-500" />
         </div>
       )}
-
-      <div className="mt-2 flex justify-end">
-        <input
-          type="text"
-          placeholder="Search by Session or User..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setPage(0);
-          }}
-          className="rounded border px-2 py-1 text-xs text-gray-800 dark:border-gray-600 dark:text-gray-100"
-        />
-      </div>
-
-      <ResponsiveContainer height={300}>
-        <ComposedChart data={pageData}>
-          <CartesianGrid strokeDasharray="3 3" />
-
-          <XAxis
-            dataKey="title"
-            interval={0}
-            tick={(props) => {
-              const { x, y, payload } = props;
-              const value = payload.value as string;
-
-              return (
-                <g
-                  transform={`translate(${x},${y + 15})`}
-                  onMouseEnter={(e) => {
-                    if (value.length > 30) {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const containerRect = containerRef.current?.getBoundingClientRect();
-                      if (!containerRect) return;
-
-                      setHoveredLabel({
-                        title: value,
-                        x: rect.left - containerRect.left + rect.width / 2,
-                        y: rect.top - containerRect.top,
-                      });
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    setHoveredLabel(null);
-                  }}
-                  style={{ cursor: value.length > 30 ? "help" : "default" }}
-                >
-                  <text textAnchor="middle" fontSize={10} fill="#111">
-                    {value.length > 30 ? value.slice(0, 30) + "…" : value}
-                  </text>
-                </g>
-              );
-            }}
-          />
-
-          <YAxis domain={[0, 100]} />
-
-          <Tooltip
-            formatter={(value) => `${Number(value).toFixed(1)}%`}
-            labelFormatter={(label, payload) => {
-              const entry = payload?.[0]?.payload as { title: string; user: string };
-              if (!entry) return label;
-
-              return entry?.title?.length > 30
-                ? `${entry?.title?.slice(0, 30)}… (${entry?.user})`
-                : `${entry?.title} (${entry?.user})`;
-            }}
-          />
-
-          <Bar
-            dataKey="agreementPercent"
-            fill="#2ecc71"
-            onAnimationEnd={() => setLoading(false)}
-            onClick={(data) => {
-              window.location.href = `/chat/${data.sessionId}`;
-            }}
-            cursor="pointer"
-            name="Agreement Percent"
-          >
-            <LabelList
-              dataKey="agreementPercent"
-              position="top"
-              formatter={(val: number) => `${val.toFixed(1)}%`}
-              style={{ fontSize: "10px", fill: "#111" }}
+      {rows.length === 0 && (
+        <div className="flex h-[300px] items-center justify-center text-sm text-gray-500">
+          No data available.
+        </div>
+      )}
+      {pageData.length > 0 && (
+        <>
+          <div className="mt-2 flex justify-end">
+            <input
+              type="text"
+              placeholder="Search by Session or User..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(0);
+              }}
+              className="rounded border px-2 py-1 text-xs text-gray-800 dark:border-gray-600 dark:text-gray-100"
             />
-          </Bar>
+          </div>
 
-          <Line
-            data={trendData}
-            dataKey="agreementPercent"
-            stroke="#8884d8"
-            strokeWidth={2}
-            dot={false}
-            isAnimationActive={false}
-            name="Trend"
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
+          <ResponsiveContainer height={300}>
+            <ComposedChart data={pageData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="title"
+                interval={0}
+                tick={(props) => {
+                  const { x, y, payload } = props;
+                  const value = payload.value as string;
 
+                  return (
+                    <g
+                      transform={`translate(${x},${y + 15})`}
+                      onMouseEnter={(e) => {
+                        if (value.length > 30) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const containerRect = containerRef.current?.getBoundingClientRect();
+                          if (!containerRect) return;
+
+                          setHoveredLabel({
+                            title: value,
+                            x: rect.left - containerRect.left + rect.width / 2,
+                            y: rect.top - containerRect.top,
+                          });
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredLabel(null);
+                      }}
+                      style={{ cursor: value.length > 30 ? "help" : "default" }}
+                    >
+                      <text textAnchor="middle" fontSize={10} fill="#111">
+                        {value.length > 30 ? value.slice(0, 30) + "…" : value}
+                      </text>
+                    </g>
+                  );
+                }}
+              />
+
+              <YAxis domain={[0, 100]} />
+
+              <Tooltip
+                formatter={(value) => `${Number(value).toFixed(1)}%`}
+                labelFormatter={(label, payload) => {
+                  const entry = payload?.[0]?.payload as { title: string; user: string };
+                  if (!entry) return label;
+
+                  return entry?.title?.length > 30
+                    ? `${entry?.title?.slice(0, 30)}… (${entry?.user})`
+                    : `${entry?.title} (${entry?.user})`;
+                }}
+              />
+
+              <Bar
+                dataKey="agreementPercent"
+                fill="#2ecc71"
+                onAnimationEnd={() => setLoading(false)}
+                onClick={(data) => {
+                  window.location.href = `/chat/${data.sessionId}`;
+                }}
+                cursor="pointer"
+                name="Agreement Percent"
+              >
+                <LabelList
+                  dataKey="agreementPercent"
+                  position="top"
+                  formatter={(val: number) => `${val.toFixed(1)}%`}
+                  style={{ fontSize: "10px", fill: "#111" }}
+                />
+              </Bar>
+
+              <Line
+                data={trendData}
+                dataKey="agreementPercent"
+                stroke="#8884d8"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+                name="Trend"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </>
+      )}
       {/* ⚡️ Absolute Hovered Label */}
       {hoveredLabel && (
         <div

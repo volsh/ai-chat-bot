@@ -84,7 +84,7 @@ export default function Slider({
           >
             ⓘ
           </span>
-          <Tooltip id={tooltipId}>
+          <Tooltip id={tooltipId} className="z-[9999] !opacity-100" style={{ zIndex: 9999 }}>
             <div className="max-w-xs text-left text-sm leading-snug">{tooltip}</div>
           </Tooltip>
         </div>

@@ -23,6 +23,7 @@ import IntensityOverTimeLine from "./IntensityOverTimeLine";
 import Spinner from "../ui/spinner";
 import { SessionReviewMetricsChart } from "./SessionReviewMetricsChart";
 import { GoalAlignmentTrendChart } from "./GoalAlignmentChart";
+import { SessionScoreTrendChart } from "./SessionScoreTrendChart";
 
 export default function TharpistAnalyticsSection() {
   const [minEmotionFrequency, setMinEmotionFrequency] = useState(3);
@@ -30,59 +31,85 @@ export default function TharpistAnalyticsSection() {
   const { filters, setFilter } = useSavedFilters<ExportFilterOptions>(
     "therapist_analytics_filters",
     {
-      emotions: [] as string[],
-      intensity: [0.1, 1] as [number, number],
-      tones: [] as string[],
-      topics: [] as string[],
-      highRiskOnly: false as boolean,
+      emotions: [],
+      intensity: [0.1, 1],
+      tones: [],
+      topics: [],
+      alignment_score: [0.1, 1],
+      minEmotionFrequency,
+      highRiskOnly: false,
       startDate: "",
       endDate: "",
       scoreCutoff: 3,
       topN: 50,
-      users: [] as string[],
+      users: [],
+      supportingTherapists: [],
     }
   );
   const { loading, previewRows, totalAnnotations } = useExportTraining(filters);
-  const { previewRows: allRows } = useExportTraining();
 
   const emotionSummary = useMemo(
     () =>
       previewRows.reduce((acc: Record<string, { count: number; totalScore: number }>, row: any) => {
-        const emotion = row.emotion || "unknown";
-        if (!acc[emotion]) acc[emotion] = { count: 0, totalScore: 0 };
-        acc[emotion].count++;
-        acc[emotion].totalScore += row.score || 0;
+        if (row.emotion) {
+          const emotion = row.emotion;
+          if (!acc[emotion]) acc[emotion] = { count: 0, totalScore: 0 };
+          acc[emotion].count++;
+          acc[emotion].totalScore += row.score || 0;
+        }
         return acc;
       }, {}),
     [previewRows]
   );
 
   const filteredRows = useMemo(() => {
-    return previewRows.filter((row) => emotionSummary[row.emotion].count >= minEmotionFrequency);
+    return previewRows.filter(
+      (row) => row.emotion && emotionSummary[row.emotion].count >= minEmotionFrequency
+    );
   }, [previewRows, emotionSummary, minEmotionFrequency]);
 
   const allEmotions = useMemo(() => {
-    return Array.from(new Set(allRows.map((s) => s.emotion).filter(Boolean))).sort() as string[];
-  }, [allRows]);
+    return Array.from(
+      new Set(previewRows.map((s) => s.emotion).filter(Boolean))
+    ).sort() as string[];
+  }, [previewRows]);
 
   const allTones = useMemo(() => {
-    return Array.from(new Set(allRows.map((s) => s.tone).filter(Boolean))).sort() as string[];
-  }, [allRows]);
+    return Array.from(new Set(previewRows.map((s) => s.tone).filter(Boolean))).sort() as string[];
+  }, [previewRows]);
 
   const allTopics = useMemo(() => {
-    return Array.from(new Set(allRows.map((s) => s.topic).filter(Boolean))).sort() as string[];
-  }, [allRows]);
+    return Array.from(new Set(previewRows.map((s) => s.topic).filter(Boolean))).sort() as string[];
+  }, [previewRows]);
+
+  const allGoals = useMemo(() => {
+    return Array.from(new Set(previewRows.map((s) => s.goal).filter(Boolean))).sort() as string[];
+  }, [previewRows]);
 
   const allUsers = useMemo(() => {
     return Array.from(
       new Map(
-        allRows.map((s) => [
+        previewRows.map((s) => [
           s.user_id,
           { value: s.user_id, label: s.full_name || s.user_id } as OptionType,
         ])
       ).values()
     );
-  }, [allRows]);
+  }, [previewRows]);
+
+  const allSupportingTherapists = useMemo(() => {
+    const therapistMap = new Map();
+
+    previewRows.forEach((row) => {
+      row.supporting_therapists?.forEach((t) => {
+        if (t?.id) {
+          therapistMap.set(t.id, { value: t.id, label: t.name });
+        }
+      });
+    });
+
+    return Array.from(therapistMap.values());
+  }, [previewRows]);
 
   if (loading) return <Spinner size={50} className="mt-8" />;
 
@@ -118,12 +145,53 @@ export default function TharpistAnalyticsSection() {
           onChange={(value) => setFilter("intensity", value)}
           useDebounce
         />
-        <DateRangePicker
-          value={{ from: filters.startDate!, to: filters.endDate! }}
-          onChange={(value) => {
-            setFilter("startDate", value.from);
-            setFilter("endDate", value.to);
-          }}
+        <Slider
+          type="range"
+          label="Alignment with goal score"
+          min={0.1}
+          max={1}
+          step={0.1}
+          value={[filters.alignment_score?.[0] || 0.1, filters.alignment_score?.[1] || 1]}
+          onChange={(value) => setFilter("alignment_score", value)}
+          useDebounce
+        />
+        <Slider
+          label="Score Cutoff Threshold"
+          min={1}
+          max={5}
+          step={1}
+          value={filters.scoreCutoff || 3}
+          onChange={(value) => setFilter("scoreCutoff", value)}
+          useDebounce
+          tooltip={
+            <>
+              Only include entries with a score equal to or above this value.
+              <ul className="mt-1 list-disc pl-5">
+                <li>
+                  <strong>5</strong> – Manually corrected, or alignment with goal ≥ <code>0.9</code>{" "}
+                  and intensity ≥ <code>0.8</code>
+                </li>
+                <li>
+                  <strong>4</strong> – Alignment with goal ≥ <code>0.9</code> and intensity ≥{" "}
+                  <code>0.4</code>, or alignment with goal ≥ <code>0.7</code> and intensity ≥{" "}
+                  <code>0.8</code>
+                </li>
+                <li>
+                  <strong>3</strong> – Alignment with goal ≥ <code>0.6</code> and intensity ≥{" "}
+                  <code>0.6</code>
+                </li>
+                <li>
+                  <strong>2</strong> – Alignment with goal ≥ <code>0.4</code> and intensity ≥{" "}
+                  <code>0.4</code>, or alignment with goal ≥ <code>0.2</code> or intensity ≥{" "}
+                  <code>0.2</code>
+                </li>
+                <li>
+                  <strong>1</strong> – Everything else (very weak signals)
+                </li>
+              </ul>
+            </>
+          }
+          tooltipId="scoreCutoffTooltip"
         />
         <Slider
           label="Minimum Emotion Frequency"
@@ -134,15 +202,6 @@ export default function TharpistAnalyticsSection() {
           useDebounce
         />
         <Slider
-          label="Score Cutoff"
-          min={1}
-          max={5}
-          step={1}
-          value={filters.scoreCutoff || 3}
-          onChange={(value) => setFilter("scoreCutoff", value)}
-          useDebounce
-        />
-        <Slider
           label="Top N Annotations"
           min={1}
           max={totalAnnotations || 100}
@@ -150,11 +209,36 @@ export default function TharpistAnalyticsSection() {
           onChange={(value) => setFilter("topN", value)}
           useDebounce
         />
+        <DateRangePicker
+          value={{ from: filters.startDate!, to: filters.endDate! }}
+          onChange={(value) => {
+            setFilter("startDate", value.from);
+            setFilter("endDate", value.to);
+          }}
+        />
         <MultiSelectFilter
-          label="User"
+          label="Goals"
+          values={filters.goals || []}
+          onChange={(v) => setFilter("goals", v)}
+          options={allGoals}
+        />
+        <MultiSelectFilter
+          label="Role"
+          options={["user", "assistant"]}
+          values={filters.messageRole || []}
+          onChange={(value) => setFilter("messageRole", value)}
+        />
+        <MultiSelectFilter
+          label="Client"
           values={filters.users || []}
           onChange={(value) => setFilter("users", value)}
           options={allUsers}
+        />
+        <MultiSelectFilter
+          label="Supporting Therapists"
+          values={filters.supportingTherapists || []}
+          onChange={(value) => setFilter("supportingTherapists", value)}
+          options={allSupportingTherapists}
         />
       </div>
 
@@ -187,7 +271,8 @@ export default function TharpistAnalyticsSection() {
           <AnnotationsConsistencyChart rows={filteredRows} />
           <SessionReviewMetricsChart rows={filteredRows} pageSize={10} />
         </div>
-        <div className="mt-8">
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <SessionScoreTrendChart rows={filteredRows} />
           <AvgScoreBar rows={filteredRows} />
         </div>
         <div className="mt-8">
