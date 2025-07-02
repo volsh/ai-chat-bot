@@ -9,6 +9,7 @@ import { useAppStore } from "@/state/useAppStore";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
+import { Analytics } from "@vercel/analytics/next";
 
 import "../styles/global.css";
 import { useShallow } from "zustand/react/shallow";
@@ -40,6 +41,7 @@ function MyApp({ Component, pageProps }: AppProps) {
     <SessionProvider initialSession={pageProps.session}>
       <ThemeProvider>
         <MainNavigator>
+          <Analytics />
           <Toaster position="top-right" />
           <header className="flex items-center justify-between border-b p-4 text-zinc-700 transition-all dark:border-zinc-800 dark:text-white">
             <h1 className="text-lg font-bold">AI Chat App</h1>
