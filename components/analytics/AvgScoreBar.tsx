@@ -55,7 +55,7 @@ export default function AvgScoreBar({ rows }: { rows: EmotionTrainingRow[] }) {
         </div>
       )}
       {annotationScoreChartData.length > 0 && (
-        <ResponsiveContainer height={300}>
+        <ResponsiveContainer height={400}>
           <BarChart
             data={annotationScoreChartData}
             margin={{ top: 10, right: 30, left: 40, bottom: 30 }}

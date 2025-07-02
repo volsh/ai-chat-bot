@@ -7,7 +7,7 @@ function DayHourHeatmap({ rows, title }: { rows: EmotionTrainingRow[]; title?: s
       Array.from({ length: 24 }, () => [] as EmotionTrainingRow[])
     );
     rows.forEach((row) => {
-      const date = new Date(row.tagged_at);
+      const date = new Date(row.message_created_at);
       const day = date.getDay();
       const hour = date.getHours();
       data[day][hour].push(row);

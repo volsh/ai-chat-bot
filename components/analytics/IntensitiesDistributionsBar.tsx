@@ -1,15 +1,16 @@
+"use client";
+
 import { EmotionTrainingRow } from "@/types";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import CustomLegend from "./CustomLegend";
-import CustomBarTooltip from "./CustomBarTooltip";
 
 export default function IntensitiesDistributionsBar({ rows }: { rows: EmotionTrainingRow[] }) {
   const [loading, setLoading] = useState(rows.length > 0);
 
   const uniqueDates = useMemo(() => {
     return Array.from(
-      new Set(rows.map((r) => new Date(r.tagged_at).toISOString().split("T")[0]))
+      new Set(rows.map((r) => new Date(r.message_created_at).toISOString().split("T")[0]))
     ).sort();
   }, [rows]);
 
@@ -17,7 +18,10 @@ export default function IntensitiesDistributionsBar({ rows }: { rows: EmotionTra
     return Array.from(new Set(rows.map((s) => s.emotion).filter(Boolean))) as string[];
   }, [rows]);
 
-  const uniqueTones = useMemo(() => Array.from(new Set(rows.map((e) => e.tone))).sort(), [rows]);
+  const uniqueTones = useMemo(
+    () => Array.from(new Set(rows.map((e) => e.tone).filter(Boolean))).sort(),
+    [rows]
+  );
 
   const toneByEmotion = useMemo(() => {
     const map: Record<string, string> = {};
@@ -32,22 +36,67 @@ export default function IntensitiesDistributionsBar({ rows }: { rows: EmotionTra
   const mergedBarData = useMemo(() => {
     return uniqueDates.map((date) => {
       const entry: Record<string, any> = { date };
+      const rowsOnDate = rows.filter(
+        (r) => new Date(r.message_created_at).toISOString().split("T")[0] === date
+      );
+
+      const totalCount = rowsOnDate.length;
+
       uniqueEmotions.forEach((emotion) => {
-        entry[emotion] = rows
-          .filter(
-            (row) =>
-              new Date(row.tagged_at).toISOString().split("T")[0] === date &&
-              row.emotion === emotion
-          )
-          .reduce((sum, row) => sum + (row.intensity ?? 0), 0);
+        const filtered = rowsOnDate.filter((row) => row.emotion === emotion);
+        const count = filtered.length;
+
+        if (count === 0) return;
+
+        const avg = filtered.reduce((sum, row) => sum + (row.intensity ?? 0), 0) / count;
+
+        const signal = avg * (count / totalCount);
+
+        entry[emotion] = signal;
+        entry[`${emotion}_avg`] = avg;
+        entry[`${emotion}_count`] = count;
       });
+
       return entry;
     });
   }, [uniqueDates, uniqueEmotions, rows]);
 
+  const CustomBarTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
+
+    return (
+      <div className="max-w-xs rounded border bg-white p-2 text-sm shadow-sm">
+        <div className="mb-1 font-semibold">Date: {label}</div>
+        {payload.map((p: any) => {
+          const emotion = p.name;
+          const signal = p.value;
+          const avg = p.payload?.[`${emotion}_avg`] ?? 0;
+          const count = p.payload?.[`${emotion}_count`] ?? 0;
+
+          return (
+            <div key={emotion} className="flex justify-between gap-2">
+              <span>{emotion}</span>
+              <span>
+                Signal: {signal.toFixed(2)} (Avg: {avg.toFixed(2)} × {count} entries)
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="relative rounded border p-4">
-      <h4 className="font-semibold">Avg Intensities Distributions for Emotions by Date</h4>
+      <h4 className="flex items-center gap-2 font-semibold">
+        Emotion Signal Strength by Date{" "}
+        <span
+          title="Displays which emotions tend to be more frequent and/or significant (higher intensities)"
+          className="cursor-help text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+        >
+          📊
+        </span>
+      </h4>
       {loading && (
         <div className="absolute left-1/2 top-1/2 flex h-[400px] -translate-y-1/2 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-t-2 border-gray-500" />
@@ -77,20 +126,14 @@ export default function IntensitiesDistributionsBar({ rows }: { rows: EmotionTra
                 name={emotion}
                 stackId="a"
                 fill={color}
-                stroke={undefined}
-                strokeWidth={0}
                 radius={[4, 4, 0, 0]}
               >
                 <LabelList
                   dataKey={emotion}
                   position="top"
                   formatter={(val: number, entry: any) => {
-                    if (!val || isNaN(val) || !entry) return ""; // Guard
-                    const total = Object.entries(entry)
-                      .filter(([k, v]) => typeof v === "number")
-                      .reduce((sum, [, v]) => sum + (v as number), 0);
-                    const percent = total > 0 ? ((val / total) * 100).toFixed(1) : "";
-                    return `${val.toFixed(2)} (${percent}%)`;
+                    if (!val || isNaN(val) || !entry) return "";
+                    return `${val.toFixed(2)}`;
                   }}
                   style={{ fontSize: "10px", fill: "#111" }}
                 />

@@ -46,6 +46,7 @@ export default function AnnotationModal({
           corrected_tone: correctedTone,
           corrected_topic: correctedTopic,
           corrected_intensity: correctedIntensity,
+          correctedAlignmentScore: correctedAlignmentScore,
           note,
           flag_reason: flagReason,
         }),
@@ -92,9 +93,9 @@ export default function AnnotationModal({
           onChange={(e) => setCorrectedIntensity(parseFloat(e.target.value))}
         />
         <Input
-          label="Corrected Alignment With Goal Score (0.1 - 1.0)"
+          label="Corrected Alignment With Goal Score (0 - 1.0)"
           type="number"
-          min={0.1}
+          min={0}
           max={1}
           step={0.1}
           value={correctedAlignmentScore}

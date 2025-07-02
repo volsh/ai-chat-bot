@@ -37,7 +37,7 @@ export default function JoinTeamPage() {
         .eq("user_id", userId)
         .eq("team_id", team_id)
         .single();
-      debugger
+
       if (membership) {
         router.push("/dashboard/therapist");
         return;

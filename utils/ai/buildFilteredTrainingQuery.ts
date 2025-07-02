@@ -15,9 +15,11 @@ export async function buildFilteredTrainingQuery(
     .single();
 
   if (filters.users?.length) query = query.in("user_id", filters.users);
+  if (filters.messageRole?.length) query = query.in("message_role", filters.messageRole);
+
   if (filters.reviewedBy?.length) query = query.in("reviewed_by", filters.reviewedBy);
   if (filters.supportingTherapists?.length) {
-    query = query.filter("supporting_therapist", "overlaps", filters.supportingTherapists);
+    query = query.contains("supporting_therapist_ids", filters.supportingTherapists);
   }
 
   if (filters.sourceTypes?.length) query = query.in("source_type", filters.sourceTypes);
@@ -30,7 +32,7 @@ export async function buildFilteredTrainingQuery(
   }
   if (
     filters.alignment_score !== undefined &&
-    (filters.alignment_score[0] > 0.1 || filters.alignment_score[1] < 1)
+    (filters.alignment_score[0] > 0 || filters.alignment_score[1] < 1)
   ) {
     if (filters.alignment_score !== undefined)
       query = query.gte("alignment_score", filters.alignment_score[0]);

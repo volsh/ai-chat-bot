@@ -1,4 +1,4 @@
-import { Message, MessageWithEmotion } from "@/types";
+import { MessageWithEmotion } from "@/types";
 import copyToClipboard from "@/utils/general/copyToClipboard";
 import clsx from "clsx";
 import { format } from "date-fns";
@@ -39,19 +39,6 @@ export default function ChatMessage({
     }
   }, [isExpanded]);
 
-  useEffect(() => {
-    if (
-      isTherapist &&
-      emotion &&
-      (emotion.flagged ||
-        emotion.emotion !== emotion.original_emotion ||
-        emotion.tone !== emotion.original_tone ||
-        emotion.topic !== emotion.original_topic ||
-        emotion.intensity !== emotion.original_intensity)
-    ) {
-      setShowDetails(true);
-    }
-  }, [emotion, isTherapist]);
   return (
     <motion.div
       ref={messageRef}
@@ -62,8 +49,7 @@ export default function ChatMessage({
       className={clsx("group relative whitespace-pre-wrap rounded-lg px-3 py-2 text-sm", {
         "bg-zinc-100 text-black dark:bg-zinc-800": msg.message_role === "user",
         "bg-blue-100 text-blue-900 dark:bg-blue-800 dark:text-white":
-          msg.message_role === "assistant",
-        "bg-zinc-200 text-zinc-800 dark:bg-zinc-700": msg.message_role === "system",
+          msg.message_role === "assistant" || msg.message_role === "system",
       })}
     >
       <div className="flex justify-between gap-1 text-xs text-gray-500 dark:text-gray-100">
@@ -113,8 +99,8 @@ export default function ChatMessage({
               "pointer-events-none absolute bottom-[-1px] left-0 right-0 h-12 bg-gradient-to-t to-transparent",
               {
                 "from-zinc-100 dark:from-zinc-800": msg.message_role === "user",
-                "from-blue-100 dark:from-blue-800": msg.message_role === "assistant",
-                "from-zinc-200 dark:from-zinc-700": msg.message_role === "system",
+                "from-blue-100 dark:from-blue-800":
+                  msg.message_role === "assistant" || msg.message_role === "system",
               }
             )}
           />
@@ -176,7 +162,7 @@ export default function ChatMessage({
       {showAnnotations && (
         <AnnotationModal
           onClose={() => setShowAnnotations(false)}
-          sourceId={msg.id!}
+          sourceId={msg.source_id!}
           sourceType="session"
           initialAnnotation={msg}
           onSaved={() => {

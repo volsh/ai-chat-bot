@@ -51,7 +51,13 @@ const TherapistCard = ({
           {isDescriptionExpanded ? therapist.short_description : truncatedDescription}
         </div>
         {therapist.short_description && therapist.short_description.length > 100 && (
-          <button className="text-xs text-blue-500" onClick={toggleDescription}>
+          <button
+            className="text-xs text-blue-500"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleDescription();
+            }}
+          >
             {isDescriptionExpanded ? "Show Less" : "Show More"}
           </button>
         )}

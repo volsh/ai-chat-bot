@@ -40,6 +40,7 @@ export default function TherapistReviewPanel() {
       intensity: [0.1, 1],
       flagReasons: [],
       tones: [],
+      alignment_score: [0, 1],
       startDate: "",
       endDate: "",
       highRiskOnly: false,
@@ -102,6 +103,12 @@ export default function TherapistReviewPanel() {
             (!filters.intensity ||
               (!f.intensity && filters.intensity[0] === 0.1 && filters.intensity[1] === 1) ||
               (f.intensity! >= filters.intensity[0] && f.intensity! <= filters.intensity[1])) &&
+            (!filters.alignment_score ||
+              (!f.alignment_score &&
+                filters.alignment_score[0] === 0 &&
+                filters.alignment_score[1] === 1) ||
+              (f.alignment_score! >= filters.alignment_score[0] &&
+                f.alignment_score! <= filters.alignment_score[1])) &&
             (!filters.emotions?.length || (f.emotion && filters.emotions.includes(f.emotion))) &&
             (!filters.tones?.length || (f.tone && filters.tones.includes(f.tone))) &&
             (!filters.flagReasons?.length ||
@@ -239,10 +246,10 @@ export default function TherapistReviewPanel() {
           <Slider
             type="range"
             label="Alignment with goal score"
-            min={0.1}
+            min={0}
             max={1}
             step={0.1}
-            value={[filters.alignment_score?.[0] || 0.1, filters.alignment_score?.[1] || 1]}
+            value={[filters.alignment_score?.[0] || 0, filters.alignment_score?.[1] || 1]}
             onChange={(v) => setFilter("alignment_score", v)}
           />
           <Slider

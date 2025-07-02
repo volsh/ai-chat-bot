@@ -2,8 +2,24 @@ import { EMOTION_COLORS } from "@/consts/analytics";
 import { EmotionTrainingRow } from "@/types";
 import { useMemo, useState } from "react";
 import { Brush, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import CustomDot from "./CustomDot";
 
+const CustomDot = (props: any) => {
+  const { cx, cy, payload, value, dataKey } = props;
+  if (value == null || isNaN(value)) {
+    return null;
+  }
+  const intensity = parseFloat(payload[dataKey]);
+  const tone = payload.tone || "neutral";
+
+  let color = "#999";
+  if (tone === "positive")
+    color = intensity >= 0.8 ? "#27ae60" : intensity >= 0.5 ? "#2ecc71" : "#a9dfbf";
+  else if (tone === "negative")
+    color = intensity >= 0.8 ? "#c0392b" : intensity >= 0.5 ? "#e74c3c" : "#f5b7b1";
+  else color = intensity >= 0.8 ? "#9b59b6" : intensity >= 0.5 ? "#f1c40f" : "#bdc3c7";
+
+  return <circle cx={cx} cy={cy} r={4} fill={color} stroke="#fff" strokeWidth={1} />;
+};
 export default function IntensityOverTimeLine({ rows }: { rows: EmotionTrainingRow[] }) {
   const uniqueEmotions = useMemo(() => {
     return Array.from(new Set(rows.map((s) => s.emotion).filter(Boolean))) as string[];
@@ -12,7 +28,7 @@ export default function IntensityOverTimeLine({ rows }: { rows: EmotionTrainingR
   const lineChartData = useMemo(() => {
     const grouped = rows.reduce(
       (acc, row) => {
-        const date = new Date(row.tagged_at).toLocaleDateString();
+        const date = new Date(row.message_created_at).toLocaleDateString();
         if (!acc[date]) acc[date] = {};
         if (!acc[date][row.emotion]) acc[date][row.emotion] = [];
         acc[date][row.emotion].push(row);
@@ -43,7 +59,7 @@ export default function IntensityOverTimeLine({ rows }: { rows: EmotionTrainingR
             return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
           })();
 
-          entry[`${emotion}_tone`] = dominantTone;
+          entry.tone = dominantTone;
         }
         return entry;
       });
@@ -52,7 +68,7 @@ export default function IntensityOverTimeLine({ rows }: { rows: EmotionTrainingR
   return (
     <div className="relative rounded border p-4">
       <h4 className="flex items-center gap-2 font-semibold">
-        Avg Intensity for Emotion Over Time
+        Daily Avg Intensity for Emotion
         <span
           title="Filter by one or a few emotions for a clearer view"
           className="cursor-help text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -89,7 +105,7 @@ export default function IntensityOverTimeLine({ rows }: { rows: EmotionTrainingR
             );
           })}
 
-          <Brush dataKey="date" height={30} stroke="#8884d8" />
+          {/* <Brush dataKey="date" height={30} stroke="#8884d8" /> */}
         </LineChart>
       </ResponsiveContainer>
     </div>

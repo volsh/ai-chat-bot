@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Emotion, Message, MessageWithEmotion, Session } from "@/types";
+import { Emotion, Message, MessageWithEmotion, Session, SessionWithGoal } from "@/types";
 import { loadSessionMessages, updateSessionTitle } from "@/utils/supabase";
 import { sendChatMessage } from "@/utils/api";
 import clsx from "clsx";
@@ -28,19 +28,13 @@ interface ChatBoxProps {
 }
 
 export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
-  const [messages, setMessages] = useState<MessageWithEmotion[]>([
-    {
-      role: "system",
-      content: "🆕 New session started. Ask me anything to begin.",
-      created_at: new Date().toISOString(),
-    } as MessageWithEmotion,
-  ]);
+  const [messages, setMessages] = useState<MessageWithEmotion[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const typingTimeout = useRef<NodeJS.Timeout>();
-  const [session, setSession] = useState<Session>();
+  const [session, setSession] = useState<SessionWithGoal>();
   const [summary, setSummary] = useState<string>(initialSession?.summary!);
   const [showEditor, setShowEditor] = useState(false);
   const [emotionLogs, setEmotionLogs] = useState<Record<string, MessageWithEmotion>>({});
@@ -74,20 +68,64 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   }, [initialSession]);
 
   const fetchSession = useCallback(async () => {
-    const { data, error } = await supabase
+    setLoading(true);
+
+    const { data: sessionData, error: sessionError } = await supabase
       .from("sessions")
-      .select("*")
+      .select(
+        `
+        *,
+        treatments (
+          id,
+          goal_id,
+          goals (
+            id,
+            title
+          )
+        )
+      `
+      )
       .eq("id", sessionId)
       .single();
 
-    setSession(data);
+    if (sessionError || !sessionData) {
+      console.error("Session not found");
+    }
+    setSession(sessionData);
+
+    try {
+      const res = await fetch("/api/generate-first-message", {
+        method: "POST",
+        body: JSON.stringify({
+          sessionId: sessionData.id,
+        }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const json = await res.json();
+
+      if (json.message === "Session already started") {
+        return;
+      }
+      const firstMessage = {
+        role: "system",
+        content: json.message,
+        created_at: new Date().toISOString(),
+      } as MessageWithEmotion;
+      const savedMessage = await saveMessageToDB(sessionData.id, firstMessage);
+      setMessages([savedMessage]);
+    } catch (err) {
+      console.error("Failed to generate first message");
+    }
+    setLoading(false);
   }, [sessionId]);
 
   const fetchMessages = useCallback(() => {
     if (!userId) return;
     if (sessionId) {
+      setLoading(true);
       loadSessionMessages(sessionId).then((msgs: MessageWithEmotion[]) => {
-        setMessages(msgs ?? []);
+        setMessages((prev) => (msgs ? [...prev, ...msgs] : prev));
         const map = Object.fromEntries(
           msgs
             .filter((msg) => !!msg.emotion)
@@ -102,6 +140,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
             ])
         );
         setEmotionLogs(map as Record<string, MessageWithEmotion>);
+        setLoading(false);
       });
     }
   }, [sessionId, userId]);
@@ -201,7 +240,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
 
   const generateMessageAndTagEmotion = async (messages: MessageWithEmotion[]) => {
     try {
-      const response = await sendChatMessage(messages);
+      const response = await sendChatMessage(session?.treatments.goals.title!, messages);
       const assistantMessage = await saveMessageToDB(sessionId!, response.message);
       setMessages([...messages, assistantMessage]);
       if (tagAssistantEnabled) {
@@ -478,7 +517,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
               </button>
             </div>
             <div className="flex gap-2">
-              <button
+              {/* <button
                 onClick={() => {
                   const next = !tagAssistantEnabled;
                   setTagAssistantEnabled(next);
@@ -489,7 +528,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
                 {tagAssistantEnabled
                   ? "🔴 Disable Assistant Tagging"
                   : "🟢 Enable Assistant Tagging"}
-              </button>
+              </button> */}
               <button
                 onClick={() => exportChatToPDF("My Chat", messages)}
                 className="text-sm text-zinc-700 underline dark:text-white"
@@ -499,7 +538,10 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => startNewChat(session?.treatment_id!)}
+                onClick={() => {
+                  setMessages([]);
+                  startNewChat(session?.treatment_id!);
+                }}
                 className="rounded bg-gray-200 px-3 py-1 text-sm text-zinc-700 shadow disabled:opacity-50 dark:bg-zinc-700 dark:text-white"
                 disabled={!session}
               >

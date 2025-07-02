@@ -33,7 +33,7 @@ export default function GroupSummaryBox({ rows }: { rows: EmotionTrainingRow[] }
 
     // Peak activity
     const hourlyCounts = rows.reduce<Record<string, number>>((acc, row) => {
-      const date = new Date(row.tagged_at);
+      const date = new Date(row.message_created_at);
       const key = `${date.toLocaleDateString()} ${date.getHours()}:00`;
       acc[key] = (acc[key] || 0) + 1;
       return acc;

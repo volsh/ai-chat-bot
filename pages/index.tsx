@@ -20,14 +20,14 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
 
   const role = profile?.role;
 
-  const destination = role === "therapist" ? "/dashboard/therapist" : redirectUserToChat(context);
-
-  return {
-    redirect: {
-      destination,
-      permanent: false,
-    },
-  };
+  if (role === "therapist")
+    return {
+      redirect: {
+        destination: "/dashboard/therapist",
+        permanent: false,
+      },
+    };
+  return redirectUserToChat(context);
 }
 
 export default function HomePage() {

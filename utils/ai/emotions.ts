@@ -1,5 +1,4 @@
 import { supabaseBrowserClient as supabase } from "@/libs/supabase";
-import { sources } from "next/dist/compiled/webpack/webpack";
 
 /**
  * Call emotion tagging endpoint with user input.

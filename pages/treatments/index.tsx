@@ -10,6 +10,7 @@ import { Plus, FolderOpen, Loader2 } from "lucide-react";
 import { CheckCircle, PlayCircle, PauseCircle, ArchiveX } from "lucide-react";
 import MultiSelectChips from "@/components/ui/multiSelectChips";
 import ClearFiltersButton from "@/components/ui/filters/ClearFiltersButton";
+import Input from "@/components/ui/input";
 
 const PAGE_SIZE = 10;
 
@@ -178,7 +179,7 @@ export default function TreatmentsPage() {
       </div>
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
-        <input
+        <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search treatments..."

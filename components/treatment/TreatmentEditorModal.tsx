@@ -12,6 +12,9 @@ import { useShallow } from "zustand/react/shallow";
 import TherapistList from "../therapist/TherpistsList";
 import Spinner from "../ui/spinner";
 import Select from "../ui/select";
+import Button from "../ui/button";
+import Input from "../ui/input";
+import Textarea from "../ui/textarea";
 
 interface Props {
   treatmentId?: string;
@@ -115,6 +118,7 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
       const { data, error } = await supabase.from("goals").select("id, title");
       if (!error) {
         setGoals(data || []);
+        setSelectedGoalId(data[0].id);
       }
     };
     loadGoals();
@@ -277,8 +281,8 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
         </h2>
 
         <div>
-          <label className="text-sm">Title</label>
-          <input
+          <Input
+            label="Title"
             ref={nameRef}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -289,14 +293,14 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-col">
-            <label className="text-sm">Emoji</label>
-            <button
+            <label className="mb-1 text-sm font-semibold">Emoji</label>
+            <Button
               onClick={() => setShowEmojiPicker((prev) => !prev)}
               className="text-2xl"
               title="Pick emoji"
             >
               {emoji}
-            </button>
+            </Button>
             {showEmojiPicker && (
               <div className="absolute z-50 mt-2">
                 <EmojiPicker
@@ -312,8 +316,8 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <label className="text-sm">Goal</label>
             <Select
+              label="Goal"
               value={selectedGoalId}
               onChange={(e) => setSelectedGoalId(e.target.value)}
               options={goals.map((g) => ({ value: g.id, label: g.title }))}
@@ -321,8 +325,8 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
           </div>
 
           <div className="flex flex-col">
-            <label className="text-sm">Color</label>
-            <input
+            <Input
+              label="Color"
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
@@ -332,10 +336,10 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
         </div>
 
         <div>
-          <label className="text-sm">Summary</label>
-          <textarea
+          <Textarea
             rows={3}
             value={summary}
+            label="Summary"
             onChange={(e) => setSummary(e.target.value)}
             className="w-full rounded border p-2 text-sm dark:bg-zinc-800 dark:text-white"
             placeholder="Short description of the treatment..."
@@ -352,14 +356,14 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
             >
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">{team.name}</h3>
-                <button
+                <Button
                   onClick={async () => {
                     setTeamId(team.id!);
                   }}
                   className={`rounded px-3 py-1 text-sm ${team.id === teamId ? "bg-green-600 text-white" : "bg-blue-600 text-white"}`}
                 >
                   {team.id === teamId ? "Selected" : "Assign to this team"}
-                </button>
+                </Button>
               </div>
               <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Therapists:</p>
               <ul className="text-sm">
@@ -389,29 +393,29 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
         </div>
 
         <div className="flex justify-between gap-2">
-          <button
+          <Button
             onClick={handleSave}
             className="w-full rounded bg-green-600 py-2 text-white hover:bg-green-700 disabled:opacity-50"
             disabled={isSaving}
           >
             Save
-          </button>
+          </Button>
           {treatmentId && isAllowedToArchive && (
-            <button
+            <Button
               onClick={() => handleArchive(!archived)}
-              className={`w-full rounded ${archived ? "bg-blue-600 hover:bg-blue-700" : "bg-yellow-600 hover:bg-yellow-700"} py-2 text-white`}
+              className={`w-full ${archived ? "bg-blue-600 hover:bg-blue-700" : "bg-yellow-600 hover:bg-yellow-700"}`}
             >
               {archived ? "Unarchive" : "Archive"}
-            </button>
+            </Button>
           )}
         </div>
 
-        <button
+        <Button
           onClick={onClose}
           className="w-full text-center text-sm text-zinc-500 underline dark:text-zinc-400"
         >
           Close
-        </button>
+        </Button>
       </div>
     </div>
   );

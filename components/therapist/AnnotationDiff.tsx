@@ -77,9 +77,10 @@ export default function AnnotationDiff({ emotion }: Props) {
           {emotion.original_alignment_score && (
             <Chip value={emotion.original_alignment_score.toFixed(2)} />
           )}
-          {emotion.corrected_alignment_score !== emotion.original_alignment_score && (
-            <Chip value={emotion.corrected_alignment_score?.toFixed(2)!} corrected />
-          )}
+          {emotion.corrected_alignment_score &&
+            emotion.corrected_alignment_score !== emotion.original_alignment_score && (
+              <Chip value={emotion.corrected_alignment_score?.toFixed(2)!} corrected />
+            )}
         </div>
       )}
 

@@ -28,7 +28,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       showPasswordToggle && type === "password" ? (showPassword ? "text" : "password") : type;
 
     return (
-      <div className="relative w-full">
+      <div className="relative">
         {label && <Label>{label}</Label>}
         <input
           ref={ref}

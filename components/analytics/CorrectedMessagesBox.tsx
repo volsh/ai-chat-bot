@@ -56,7 +56,7 @@ export default function CorrectedMessagesBox({
               Topic: {msg.original_topic ?? "N/A"} ➔ {msg.topic ?? "N/A"}
             </div>
             <div className="mt-1 flex justify-between">
-              <span>{format(new Date(msg.tagged_at), "PP p")}</span>
+              <span>{format(new Date(msg.message_created_at), "PP p")}</span>
               {msg.session_id && (
                 <Link
                   href={`/chat/${msg.session_id}?messageId=${msg.source_id}`}

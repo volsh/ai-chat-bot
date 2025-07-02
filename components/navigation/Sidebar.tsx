@@ -5,16 +5,21 @@ export default function Sidebar() {
   const { userProfile } = useAppStore();
   if (!userProfile) return null;
 
-  const links =
-    userProfile.role === "admin"
+  const role = userProfile.role;
+
+  let links = [{ label: "Me", href: `/profile/${role}` }];
+
+  links = links.concat(
+    role === "admin"
       ? [{ label: "Admin", href: "/admin" }]
-      : userProfile.role === "therapist"
+      : role === "therapist"
         ? [{ label: "Dashboard", href: "/dashboard/therapist" }]
         : [
-            { label: "Sessions", href: "/chat" },
-            { label: "Emotion Trends", href: "/dashboard/user/analytics" },
-          ];
-  links.push({ label: "Me", href: "/auth/me" });
+            { label: "My Treatments", href: "/treatments" },
+            { label: "Chat", href: "/chat" },
+            { label: "Analytics", href: "/dashboard/user/analytics" },
+          ]
+  );
   return (
     <aside className="w-64 bg-zinc-100 p-4 dark:bg-zinc-900">
       <nav className="space-y-2">

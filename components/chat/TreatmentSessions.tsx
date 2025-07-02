@@ -1,7 +1,7 @@
 import { Session, Treatment } from "@/types";
 import clsx from "clsx";
 import { useRouter } from "next/router";
-import DragHandle from "../DragHandle";
+import DragHandle from "../ui/DragHandle";
 import { DraggableProvided } from "@hello-pangea/dnd";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
@@ -46,7 +46,7 @@ export default function ({
             />
           </button>
           <div
-            onClick={() => router.push(`/treatment/${treatment.id}`)}
+            onClick={() => router.push(`/treatments/${treatment.id}/sessions`)}
             className="flex cursor-pointer items-center gap-2 truncate"
           >
             {treatment.emoji && <span>{treatment.emoji}</span>}

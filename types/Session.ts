@@ -8,7 +8,6 @@ export interface Session {
   ended_at: string;
   paused_at: string;
   total_pause_seconds: number;
-  goal: string;
   emoji: string;
   color: string;
   folder_id: string;

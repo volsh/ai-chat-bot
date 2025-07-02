@@ -2,6 +2,9 @@ import { GetServerSidePropsContext, NextApiRequest, NextApiResponse } from "next
 import { redirectUserToChat } from "@/utils/chat/redirectUserToChat";
 import ssrGuard from "@/utils/auth/ssrGuard";
 import { createSupabaseServerClient } from "@/libs/supabase";
+import { Session } from "inspector/promises";
+import { SessionWithGoal } from "@/types";
+import { PostgrestError } from "@supabase/supabase-js";
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
   const redirect = await ssrGuard(context);
@@ -22,19 +25,19 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
   if (role === "therapist") {
     const { client } = context.query;
     if (client) {
-      const { data: sessions, error } = await supabase
+      const { data: sessions, error } = (await supabase
         .from("sessions")
         .select("id, treatments(user_id)")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })) as unknown as {
+        data: SessionWithGoal[];
+        error: PostgrestError;
+      };
 
       if (error || !sessions?.length) {
         destination = "/dashboard/therapist";
       } else {
-        const lastSession = sessions.find(
-          (s) =>
-            Array.isArray(s.treatments) &&
-            s.treatments.some((treatment) => treatment.user_id === client)
-        );
+        const lastSession = sessions.find((s) => s.treatments.user_id === client);
+
         if (lastSession) {
           destination = `/chat/${lastSession?.id}`;
         } else {
@@ -45,7 +48,7 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
       destination = "/dashboard/therapist";
     }
   } else {
-    destination = redirectUserToChat(context);
+    return redirectUserToChat(context);
   }
 
   return {

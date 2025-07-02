@@ -3,6 +3,8 @@ export type EmotionTrainingRow = {
   source_id: string;
   session_id: string;
   session_title: string;
+  session_created_at: string;
+  session_order_index: string;
   user_id: string | null;
   full_name: string;
   message_role: string;
@@ -30,4 +32,8 @@ export type EmotionTrainingRow = {
   reviewed_by_name: string;
   supporting_therapists: { id: string; name: string }[];
   message_created_at: string;
+  treatment_id: string;
+  treatment_name: string;
+  treatment_status: string;
+  treatment_created_at: string;
 };

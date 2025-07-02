@@ -7,6 +7,7 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   showCount?: boolean;
   maxLength?: number;
   autoResize?: boolean;
+  label?: string;
 }
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
@@ -18,6 +19,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       showCount = false,
       maxLength,
       autoResize = false,
+      label,
       ...props
     },
     ref
@@ -55,6 +57,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 
     return (
       <div className="relative w-full">
+        {label && <label className="text-sm">{label}</label>}
         <textarea
           ref={combinedRef}
           maxLength={maxLength}

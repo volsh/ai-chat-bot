@@ -22,11 +22,7 @@ import clsx from "clsx";
 import ssrGuard from "@/utils/auth/ssrGuard";
 import { GetServerSidePropsContext } from "next";
 import { useAppStore } from "@/state";
-import Slider from "@/components/ui/slider";
-import Toggle from "@/components/ui/toggle";
-import Select from "@/components/ui/select";
-import ClearFiltersButton from "@/components/ui/filters/ClearFiltersButton";
-import CustomDot from "@/components/analytics/CustomDot";
+import AnalyticsSection from "@/components/analytics/TharpistAnalyticsSection";
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
   const redirect = await ssrGuard(context, ["user"]);
@@ -79,10 +75,13 @@ export default function UserAnalyticsScreen() {
 
   const uniqueDates = useMemo(() => Array.from(new Set(flat.map((e) => e.date))).sort(), [flat]);
   const uniqueEmotions = useMemo(
-    () => Array.from(new Set(flat.map((e) => e.emotion))).sort(),
+    () => Array.from(new Set(flat.map((e) => e.emotion).filter(Boolean))).sort(),
     [flat]
   );
-  const uniqueTones = useMemo(() => Array.from(new Set(flat.map((e) => e.tone))).sort(), [flat]);
+  const uniqueTones = useMemo(
+    () => Array.from(new Set(flat.map((e) => e.tone).filter(Boolean))).sort(),
+    [flat]
+  );
 
   useEffect(() => {
     setSelectedEmotion(uniqueEmotions?.[0]);
@@ -203,178 +202,179 @@ export default function UserAnalyticsScreen() {
   };
 
   return (
-    <div className="relative p-4">
-      <h1 className="mb-4 text-xl font-bold text-zinc-800 dark:text-zinc-100">📈 Emotion Trends</h1>
+    <AnalyticsSection />
+    // <div className="relative p-4">
+    //   <h1 className="mb-4 text-xl font-bold text-zinc-800 dark:text-zinc-100">📈 Analytics</h1>
 
-      <div className="mb-4 flex flex-wrap items-center gap-4">
-        {(emotionFilter.length > 0 ||
-          toneFilter.length > 0 ||
-          intensityFilter[0] !== 0.1 ||
-          intensityFilter[1] !== 1 ||
-          range.from ||
-          range.to) && (
-          <div className="animate-fade-in mb-4 flex w-full justify-end">
-            <ClearFiltersButton
-              onClick={() => {
-                setEmotionFilter([]);
-                setToneFilter([]);
-                setIntensityFilter([0.1, 1]);
-                setRange({ from: "", to: "" });
-              }}
-            />
-          </div>
-        )}
+    //   <div className="mb-4 flex flex-wrap items-center gap-4">
+    //     {(emotionFilter.length > 0 ||
+    //       toneFilter.length > 0 ||
+    //       intensityFilter[0] !== 0.1 ||
+    //       intensityFilter[1] !== 1 ||
+    //       range.from ||
+    //       range.to) && (
+    //       <div className="animate-fade-in mb-4 flex w-full justify-end">
+    //         <ClearFiltersButton
+    //           onClick={() => {
+    //             setEmotionFilter([]);
+    //             setToneFilter([]);
+    //             setIntensityFilter([0.1, 1]);
+    //             setRange({ from: "", to: "" });
+    //           }}
+    //         />
+    //       </div>
+    //     )}
 
-        <MultiSelectFilter
-          label="Emotions"
-          values={emotionFilter}
-          options={uniqueEmotions}
-          onChange={setEmotionFilter}
-        />
-        <MultiSelectFilter
-          label="Tone"
-          values={toneFilter}
-          options={uniqueTones}
-          onChange={setToneFilter}
-        />
-        <Slider
-          type="range"
-          label="Intensity"
-          min={0.1}
-          max={1}
-          step={0.1}
-          value={intensityFilter}
-          onChange={setIntensityFilter}
-        />
-        <DateRangePicker value={range} onChange={setRange} />
-        <Select
-          label="Chart Type"
-          value={chartType}
-          onChange={(e) => setChartType(e.target.value as any)}
-          options={[
-            { value: "line", label: "Line" },
-            { value: "bar", label: "Bar" },
-            { value: "area", label: "Area" },
-          ]}
-        />
-        {chartType === "bar" && (
-          <>
-            <Toggle
-              label="Group Bars"
-              checked={!stackedBars}
-              onChange={() => setStackedBars((prev) => !prev)}
-            />
-            <Toggle
-              checked={normalizeBarChart}
-              onChange={() => setNormalizeBarChart((p) => !p)}
-              label="Normalize Bar"
-            />
-          </>
-        )}
-        {chartType === "area" && (
-          <Toggle
-            checked={normalizeArea}
-            onChange={() => setNormalizeArea((p) => !p)}
-            label="Normalize Area"
-          />
-        )}
-        {chartType === "line" && (
-          <Select
-            label="Emotion"
-            value={selectedEmotion}
-            onChange={(e) => setSelectedEmotion(e.target.value)}
-            options={uniqueEmotions.map((e) => ({ value: e, label: e }))}
-          />
-        )}
-      </div>
+    //     <MultiSelectFilter
+    //       label="Emotions"
+    //       values={emotionFilter}
+    //       options={uniqueEmotions}
+    //       onChange={setEmotionFilter}
+    //     />
+    //     <MultiSelectFilter
+    //       label="Tone"
+    //       values={toneFilter}
+    //       options={uniqueTones}
+    //       onChange={setToneFilter}
+    //     />
+    //     <Slider
+    //       type="range"
+    //       label="Intensity"
+    //       min={0.1}
+    //       max={1}
+    //       step={0.1}
+    //       value={intensityFilter}
+    //       onChange={setIntensityFilter}
+    //     />
+    //     <DateRangePicker value={range} onChange={setRange} />
+    //     <Select
+    //       label="Chart Type"
+    //       value={chartType}
+    //       onChange={(e) => setChartType(e.target.value as any)}
+    //       options={[
+    //         { value: "line", label: "Line" },
+    //         { value: "bar", label: "Bar" },
+    //         { value: "area", label: "Area" },
+    //       ]}
+    //     />
+    //     {chartType === "bar" && (
+    //       <>
+    //         <Toggle
+    //           label="Group Bars"
+    //           checked={!stackedBars}
+    //           onChange={() => setStackedBars((prev) => !prev)}
+    //         />
+    //         <Toggle
+    //           checked={normalizeBarChart}
+    //           onChange={() => setNormalizeBarChart((p) => !p)}
+    //           label="Normalize Bar"
+    //         />
+    //       </>
+    //     )}
+    //     {chartType === "area" && (
+    //       <Toggle
+    //         checked={normalizeArea}
+    //         onChange={() => setNormalizeArea((p) => !p)}
+    //         label="Normalize Area"
+    //       />
+    //     )}
+    //     {chartType === "line" && (
+    //       <Select
+    //         label="Emotion"
+    //         value={selectedEmotion}
+    //         onChange={(e) => setSelectedEmotion(e.target.value)}
+    //         options={uniqueEmotions.map((e) => ({ value: e, label: e }))}
+    //       />
+    //     )}
+    //   </div>
 
-      {loading ? (
-        <Spinner />
-      ) : (
-        <div className="h-[400px]">
-          {chartType === "line" && selectedEmotion && (
-            <ResponsiveContainer>
-              <LineChart data={selectedEmotionData}>
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line dataKey="intensity" stroke="#8884d8" dot={<CustomDot />} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
+    //   {loading ? (
+    //     <Spinner />
+    //   ) : (
+    //     <div className="h-[400px]">
+    //       {chartType === "line" && selectedEmotion && (
+    //         <ResponsiveContainer>
+    //           <LineChart data={selectedEmotionData}>
+    //             <XAxis dataKey="date" />
+    //             <YAxis />
+    //             <Tooltip />
+    //             <Legend />
+    //             <Line dataKey="intensity" stroke="#8884d8" dot={<CustomDot />} />
+    //           </LineChart>
+    //         </ResponsiveContainer>
+    //       )}
 
-          {chartType === "bar" && (
-            <ResponsiveContainer>
-              <BarChart data={mergedBarData} barGap={4} barCategoryGap={stackedBars ? 0 : 16}>
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip content={<CustomBarTooltip />} />
-                <CustomLegend />
-                {uniqueEmotions.map((emotion) => {
-                  const tone = toneByEmotion[emotion];
-                  const color =
-                    tone === "positive" ? "#2ecc71" : tone === "negative" ? "#e74c3c" : "#f1c40f";
+    //       {chartType === "bar" && (
+    //         <ResponsiveContainer>
+    //           <BarChart data={mergedBarData} barGap={4} barCategoryGap={stackedBars ? 0 : 16}>
+    //             <XAxis dataKey="date" />
+    //             <YAxis />
+    //             <Tooltip content={<CustomBarTooltip />} />
+    //             <CustomLegend />
+    //             {uniqueEmotions.map((emotion) => {
+    //               const tone = toneByEmotion[emotion];
+    //               const color =
+    //                 tone === "positive" ? "#2ecc71" : tone === "negative" ? "#e74c3c" : "#f1c40f";
 
-                  return (
-                    <Bar
-                      key={emotion}
-                      dataKey={emotion}
-                      name={emotion}
-                      stackId={stackedBars ? "a" : undefined}
-                      fill={stackedBars ? color : "rgba(0,0,0,0.01)"}
-                      stroke={color}
-                      strokeWidth={stackedBars ? 0 : 2}
-                      radius={[4, 4, 0, 0]}
-                    >
-                      <LabelList
-                        dataKey={emotion}
-                        position="top"
-                        formatter={(val: number, entry: any) => {
-                          if (!val || isNaN(val) || !entry) return "";
-                          const total = Object.entries(entry)
-                            .filter(([k, v]) => typeof v === "number")
-                            .reduce((sum, [, v]) => sum + (v as number), 0);
-                          const percent = total > 0 ? ((val / total) * 100).toFixed(1) : "";
-                          return `${val.toFixed(2)} (${percent}%)`;
-                        }}
-                        style={{ fontSize: "10px", fill: "#111" }}
-                      />
-                    </Bar>
-                  );
-                })}
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+    //               return (
+    //                 <Bar
+    //                   key={emotion}
+    //                   dataKey={emotion}
+    //                   name={emotion}
+    //                   stackId={stackedBars ? "a" : undefined}
+    //                   fill={stackedBars ? color : "rgba(0,0,0,0.01)"}
+    //                   stroke={color}
+    //                   strokeWidth={stackedBars ? 0 : 2}
+    //                   radius={[4, 4, 0, 0]}
+    //                 >
+    //                   <LabelList
+    //                     dataKey={emotion}
+    //                     position="top"
+    //                     formatter={(val: number, entry: any) => {
+    //                       if (!val || isNaN(val) || !entry) return "";
+    //                       const total = Object.entries(entry)
+    //                         .filter(([k, v]) => typeof v === "number")
+    //                         .reduce((sum, [, v]) => sum + (v as number), 0);
+    //                       const percent = total > 0 ? ((val / total) * 100).toFixed(1) : "";
+    //                       return `${val.toFixed(2)} (${percent}%)`;
+    //                     }}
+    //                     style={{ fontSize: "10px", fill: "#111" }}
+    //                   />
+    //                 </Bar>
+    //               );
+    //             })}
+    //           </BarChart>
+    //         </ResponsiveContainer>
+    //       )}
 
-          {chartType === "area" && (
-            <ResponsiveContainer>
-              <AreaChart data={mergedAreaData}>
-                <XAxis dataKey="date" />
-                <YAxis domain={[0, normalizeArea ? 100 : "auto"]} />
-                <Tooltip />
-                <CustomLegend />
-                {Array.from(uniqueTones).map((tone) => (
-                  <Area
-                    key={tone}
-                    type="monotone"
-                    dataKey={tone}
-                    name={tone.charAt(0).toUpperCase() + tone.slice(1)}
-                    stroke={
-                      tone === "positive" ? "#2ecc71" : tone === "negative" ? "#e74c3c" : "#f1c40f"
-                    }
-                    fill={
-                      tone === "positive" ? "#2ecc71" : tone === "negative" ? "#e74c3c" : "#f1c40f"
-                    }
-                    fillOpacity={0.3}
-                    stackId="1"
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      )}
-    </div>
+    //       {chartType === "area" && (
+    //         <ResponsiveContainer>
+    //           <AreaChart data={mergedAreaData}>
+    //             <XAxis dataKey="date" />
+    //             <YAxis domain={[0, normalizeArea ? 100 : "auto"]} />
+    //             <Tooltip />
+    //             <CustomLegend />
+    //             {Array.from(uniqueTones).map((tone) => (
+    //               <Area
+    //                 key={tone}
+    //                 type="monotone"
+    //                 dataKey={tone}
+    //                 name={tone.charAt(0).toUpperCase() + tone.slice(1)}
+    //                 stroke={
+    //                   tone === "positive" ? "#2ecc71" : tone === "negative" ? "#e74c3c" : "#f1c40f"
+    //                 }
+    //                 fill={
+    //                   tone === "positive" ? "#2ecc71" : tone === "negative" ? "#e74c3c" : "#f1c40f"
+    //                 }
+    //                 fillOpacity={0.3}
+    //                 stackId="1"
+    //               />
+    //             ))}
+    //           </AreaChart>
+    //         </ResponsiveContainer>
+    //       )}
+    //     </div>
+    //   )}
+    // </div>
   );
 }

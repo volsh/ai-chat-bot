@@ -24,9 +24,15 @@ import Spinner from "../ui/spinner";
 import { SessionReviewMetricsChart } from "./SessionReviewMetricsChart";
 import { GoalAlignmentTrendChart } from "./GoalAlignmentChart";
 import { SessionScoreTrendChart } from "./SessionScoreTrendChart";
+import { useAppStore } from "@/state";
 
 export default function TharpistAnalyticsSection() {
-  const [minEmotionFrequency, setMinEmotionFrequency] = useState(3);
+  const [minEmotionFrequency, setMinEmotionFrequency] = useState(2);
+
+  const userProfile = useAppStore((s) => s.userProfile);
+  const userId = userProfile?.id;
+
+  const isTherapist = userProfile?.role === "therapist";
 
   const { filters, setFilter } = useSavedFilters<ExportFilterOptions>(
     "therapist_analytics_filters",
@@ -35,17 +41,19 @@ export default function TharpistAnalyticsSection() {
       intensity: [0.1, 1],
       tones: [],
       topics: [],
-      alignment_score: [0.1, 1],
+      alignment_score: [0, 1],
       minEmotionFrequency,
       highRiskOnly: false,
       startDate: "",
       endDate: "",
-      scoreCutoff: 3,
+      // scoreCutoff: 3,
       topN: 50,
-      users: [],
+      users: !isTherapist ? [userId!] : [],
       supportingTherapists: [],
+      messageRole: !isTherapist ? ["user"] : [],
     }
   );
+
   const { loading, previewRows, totalAnnotations } = useExportTraining(filters);
 
   const emotionSummary = useMemo(
@@ -64,7 +72,7 @@ export default function TharpistAnalyticsSection() {
 
   const filteredRows = useMemo(() => {
     return previewRows.filter(
-      (row) => row.emotion && emotionSummary[row.emotion].count >= minEmotionFrequency
+      (row) => (emotionSummary[row.emotion]?.count ?? 0) >= minEmotionFrequency
     );
   }, [previewRows, emotionSummary, minEmotionFrequency]);
 
@@ -148,14 +156,14 @@ export default function TharpistAnalyticsSection() {
         <Slider
           type="range"
           label="Alignment with goal score"
-          min={0.1}
+          min={0}
           max={1}
           step={0.1}
-          value={[filters.alignment_score?.[0] || 0.1, filters.alignment_score?.[1] || 1]}
+          value={[filters.alignment_score?.[0] || 0, filters.alignment_score?.[1] || 1]}
           onChange={(value) => setFilter("alignment_score", value)}
           useDebounce
         />
-        <Slider
+        {/* <Slider
           label="Score Cutoff Threshold"
           min={1}
           max={5}
@@ -192,17 +200,17 @@ export default function TharpistAnalyticsSection() {
             </>
           }
           tooltipId="scoreCutoffTooltip"
-        />
+        /> */}
         <Slider
           label="Minimum Emotion Frequency"
-          min={1}
+          min={0}
           max={10}
           value={minEmotionFrequency}
           onChange={(val) => setMinEmotionFrequency(val)}
           useDebounce
         />
         <Slider
-          label="Top N Annotations"
+          label="Top N Entries"
           min={1}
           max={totalAnnotations || 100}
           value={filters.topN || 50}
@@ -222,18 +230,23 @@ export default function TharpistAnalyticsSection() {
           onChange={(v) => setFilter("goals", v)}
           options={allGoals}
         />
-        <MultiSelectFilter
-          label="Role"
-          options={["user", "assistant"]}
-          values={filters.messageRole || []}
-          onChange={(value) => setFilter("messageRole", value)}
-        />
-        <MultiSelectFilter
-          label="Client"
-          values={filters.users || []}
-          onChange={(value) => setFilter("users", value)}
-          options={allUsers}
-        />
+        {isTherapist && (
+          <>
+            {" "}
+            <MultiSelectFilter
+              label="Role"
+              options={["user", "assistant"]}
+              values={filters.messageRole || []}
+              onChange={(value) => setFilter("messageRole", value)}
+            />
+            <MultiSelectFilter
+              label="Client"
+              values={filters.users || []}
+              onChange={(value) => setFilter("users", value)}
+              options={allUsers}
+            />
+          </>
+        )}
         <MultiSelectFilter
           label="Supporting Therapists"
           values={filters.supportingTherapists || []}
@@ -246,13 +259,9 @@ export default function TharpistAnalyticsSection() {
       <div className="mb-8">
         <h4 className="mb-2 font-semibold">📊 Analytics Overview</h4>
 
-        {filters.users?.length === 1 ? (
-          <div className="mt-8">
-            <ClientTrendSummary rows={filteredRows} />
-          </div>
-        ) : (
-          <SummaryBox rows={filteredRows} />
-        )}
+        <div className="mt-8">
+          <ClientTrendSummary rows={filteredRows} />
+        </div>
         <div className="mt-2 grid grid-cols-1 gap-8 sm:grid-cols-2">
           <EmotionDistributionPie rows={filteredRows} />
           <ToneDistributionPie rows={filteredRows} />
@@ -261,22 +270,22 @@ export default function TharpistAnalyticsSection() {
           <IntensitiesDistributionsBar rows={filteredRows} />
           <IntensitiesDistributionsArea rows={filteredRows} />
         </div>
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mt-8">
           <IntensityOverTimeLine rows={filteredRows} />
-          <div className="min-w-0 overflow-x-auto">
-            <DayHourHeatmap rows={filteredRows} title="Emotions Frequencies Time Slots" />
-          </div>
+          {/* <AvgScoreBar rows={filteredRows} /> */}
         </div>
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <AnnotationsConsistencyChart rows={filteredRows} />
-          <SessionReviewMetricsChart rows={filteredRows} pageSize={10} />
-        </div>
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <SessionScoreTrendChart rows={filteredRows} />
-          <AvgScoreBar rows={filteredRows} />
+        <div className="mt-8 min-w-0 overflow-x-auto">
+          <DayHourHeatmap rows={filteredRows} title="Emotions Frequencies Time Slots" />
         </div>
         <div className="mt-8">
+          <SessionScoreTrendChart rows={filteredRows} />
+        </div>
+        {/* <div className="mt-8">
           <GoalAlignmentTrendChart rows={filteredRows} />
+        </div> */}
+        <div className="mt-8">
+          <AnnotationsConsistencyChart rows={filteredRows} />
+          {/* <SessionReviewMetricsChart rows={filteredRows} /> */}
         </div>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <CorrectedMessagesBox rows={filteredRows} />

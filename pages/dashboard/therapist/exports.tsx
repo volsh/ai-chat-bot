@@ -98,10 +98,10 @@ export default function ExportTrainingScreen() {
           <Slider
             type="range"
             label="Alignment with goal score"
-            min={0.1}
+            min={0}
             max={1}
             step={0.1}
-            value={[filters.alignment_score?.[0] || 0.1, filters.alignment_score?.[1] || 1]}
+            value={[filters.alignment_score?.[0] || 0, filters.alignment_score?.[1] || 1]}
             onChange={(value: [number, number]) =>
               setFilters((f) => ({ ...f, alignment_score: [value[0], value[1]] }))
             }
@@ -144,7 +144,7 @@ export default function ExportTrainingScreen() {
             tooltipId="scoreCutoffTooltip"
           />
           <Slider
-            label="Top N Annotations"
+            label="Top N Entries"
             min={1}
             max={totalAnnotations || 100}
             value={filters.topN || 50}

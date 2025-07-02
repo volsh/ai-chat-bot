@@ -8,6 +8,7 @@ import { useAppStore } from "@/state";
 import { useShallow } from "zustand/react/shallow";
 import Modal from "../ui/modal";
 import Spinner from "../ui/spinner";
+import { Session } from "@/types";
 
 interface Props {
   sessionId: string;
@@ -15,7 +16,7 @@ interface Props {
   mode?: "sidebar" | "chat";
   onClose: () => void;
   onRefresh?: () => void;
-  onDelete?: (deletedSessionId: string) => void;
+  onDelete?: (session: Session) => void;
 }
 
 export default function SessionEditorModal({
@@ -27,6 +28,7 @@ export default function SessionEditorModal({
   onDelete,
 }: Props) {
   const nameRef = useRef<HTMLInputElement>(null);
+  const [session, setSession] = useState<Session>();
   const [title, setTitle] = useState(initialTitle);
   const [emoji, setEmoji] = useState("\ud83e\udde0");
   const [color, setColor] = useState("#3b82f6");
@@ -47,18 +49,22 @@ export default function SessionEditorModal({
   useEffect(() => {
     if (!sessionId || !userProfile) return;
     const fetchData = async () => {
-      const { data: sessionData } = await supabase
+      const { data: sessionData, error: sessionError } = await supabase
         .from("sessions")
         .select("*")
         .eq("id", sessionId)
         .single();
 
-      if (sessionData) {
-        setTitle(sessionData.title || "");
-        setEmoji(sessionData.emoji || "\ud83e\udde0");
-        setColor(sessionData.color || "#3b82f6");
-        setSummary(sessionData.summary || "");
+      if (!sessionData || sessionError) {
+        toast.error("Failed to load session");
+        return;
       }
+
+      setSession(sessionData);
+      setTitle(sessionData.title || "");
+      setEmoji(sessionData.emoji || "\ud83e\udde0");
+      setColor(sessionData.color || "#3b82f6");
+      setSummary(sessionData.summary || "");
     };
     fetchData();
   }, [sessionId, userProfile]);
@@ -105,17 +111,10 @@ export default function SessionEditorModal({
     setIsDeleteModalOpen(false);
     setIsDeleting(true);
     await supabase.from("sessions").delete().eq("id", sessionId);
-    await supabase.from("messages").delete().eq("session_id", sessionId);
-    await supabase.from("session_events").insert({
-      session_id: sessionId,
-      user_id: userProfile?.id,
-      event_type: "delete",
-      description: `Deleted session '${sessionId}'`,
-    });
     toast.success("Session deleted.");
     onRefresh?.();
     onClose();
-    onDelete?.(sessionId);
+    onDelete?.(session!);
     setIsDeleting(false);
   };
 

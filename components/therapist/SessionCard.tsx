@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { CheckSquare, Square } from "lucide-react";
-import { MessageWithEmotion, FlaggedSession } from "@/types";
-import SeverityBar from "@/components/ui/SeverityBar";
+import { MessageWithEmotion, FlaggedSession, EmotionTrainingRow } from "@/types";
+import SeverityBar from "../SeverityBar";
 import { SeverityBadge } from "../SeverityBadge";
 import { Pencil } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Tooltip } from "react-tooltip";
 import SessionSummaryPanel from "./SessionSummaryPanel";
 import AnnotationDiff from "./AnnotationDiff";
-import { calculateSessionScore } from "@/utils/chat/calculateSessionScore";
+import { calculateSessionScore } from "@/utils/analytics/calculateSessionScore";
 
 interface Props {
   session: FlaggedSession;
@@ -42,7 +42,9 @@ export default function SessionCard({
   const filteredFlags = flagged_messages.filter(filterFlags);
   const visibleFlags = filteredFlags.slice(0, visibleCount);
 
-  const session_score = calculateSessionScore(session.flagged_messages).finalScore;
+  const session_score = calculateSessionScore(
+    session.flagged_messages as unknown as EmotionTrainingRow[]
+  ).finalScore;
 
   return (
     <div

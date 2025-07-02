@@ -6,6 +6,7 @@ import Card from "@/components/ui/card";
 import { FineTuneEvent } from "@/types";
 import clsx from "clsx";
 import toast from "react-hot-toast";
+import Select from "@/components/ui/select";
 
 const EVENTS_PER_PAGE = 10; // You can adjust this as needed
 
@@ -57,14 +58,16 @@ export default function FineTuneEventLogPage() {
     <div className="mt-8">
       <h2 className="mb-2 text-lg font-semibold">🔔 Fine-Tune Event Logs</h2>
       <div className="mb-4 flex gap-4">
-        <select className="rounded border p-1 text-sm" onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All Statuses</option>
-          <option value="succeeded">Success</option>
-          <option value="failed">Failed</option>
-          <option value="running">Running</option>
-          <option value="validating_files">Validating Files</option>
-          {/* <option value="retrying">Retrying</option> */}
-        </select>
+        <Select
+          onChange={(e) => setStatus(e.target.value)}
+          options={[
+            { value: "", label: "All Statuses" },
+            { value: "succeeded", label: "Success" },
+            { value: "failed", label: "Failed" },
+            { value: "running", label: "Running" },
+            { value: "validating_files", label: "Validating Files" },
+          ]}
+        ></Select>
       </div>
 
       {loading ? (

@@ -17,9 +17,9 @@ export function GoalAlignmentTrendChart({ rows }: { rows: EmotionTrainingRow[] }
   const data = useMemo(() => {
     const grouped = rows.reduce<Record<string, Record<string, { total: number; count: number }>>>(
       (acc, row) => {
-        if (!row.goal || !row.tagged_at || row.alignment_score == null) return acc;
+        if (!row.goal || !row.message_created_at || row.alignment_score == null) return acc;
 
-        const date = new Date(row.tagged_at).toISOString().split("T")[0];
+        const date = new Date(row.message_created_at).toISOString().split("T")[0];
         if (!acc[date]) acc[date] = {};
         if (!acc[date][row.goal]) acc[date][row.goal] = { total: 0, count: 0 };
 

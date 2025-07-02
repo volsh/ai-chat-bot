@@ -12,7 +12,7 @@ import {
   DragStart,
   BeforeCapture,
 } from "@hello-pangea/dnd";
-import DragHandle from "../DragHandle";
+import DragHandle from "../ui/DragHandle";
 import SessionEditorModal from "./SessionEditorModal";
 import { Tooltip } from "react-tooltip";
 import { flattenTree, reorderTree } from "@/utils/folderUtils";
@@ -151,10 +151,12 @@ export default function SessionSidebar({
     }
   };
 
-  const handleDelete = (deletedSessionId: string) => {
-    if (deletedSessionId === currentSessionId) {
-      const fallback = sessions.filter((s) => s.id !== deletedSessionId)[0]?.id;
-      router.push(fallback ? `/chat/${fallback}` : `/chat`);
+  const handleDelete = (deletedSession: Session) => {
+    if (deletedSession.id === currentSessionId) {
+      const filtered = sessions.filter(
+        (s) => s.treatment_id === deletedSession.treatment_id && s.id !== deletedSession.id
+      );
+      router.push(filtered.length ? `/chat/${filtered[0].id}` : `/chat`);
     }
   };
 

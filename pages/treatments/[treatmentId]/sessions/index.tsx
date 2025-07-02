@@ -12,6 +12,65 @@ import startNewChat from "@/utils/chat/startNewChat";
 
 const PAGE_SIZE = 12;
 
+function SessionCardWithTimer({
+  session,
+  toggleBookmark,
+}: {
+  session: Session;
+  toggleBookmark: (id: string, bookmarked: boolean) => void;
+}) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const createdAt = new Date(session.created_at!);
+  const endsAt = new Date(createdAt.getTime() + 2 * 60 * 60 * 1000);
+  const isActive = now < endsAt;
+
+  const timeLeft = Math.max(0, endsAt.getTime() - now.getTime());
+  const minutes = Math.floor(timeLeft / (1000 * 60));
+  const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+  return (
+    <div className="group relative rounded-lg border p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+      <h2 className="mb-1 text-lg font-semibold">{session.title}</h2>
+      <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">{createdAt.toLocaleString()}</p>
+
+      {isActive ? (
+        <p className="text-xs font-medium text-green-600 dark:text-green-400">
+          🟢 Active — ends in {minutes}m {seconds}s
+        </p>
+      ) : (
+        <p className="text-xs font-medium text-gray-400 dark:text-gray-500">🔴 Session ended</p>
+      )}
+
+      {session.summary && (
+        <p className="mt-2 line-clamp-3 text-sm text-gray-600 dark:text-gray-300">
+          {session.summary}
+        </p>
+      )}
+
+      <div className="mt-4 flex items-center justify-between">
+        <Link href={`/chat/${session.id}`} className="text-sm text-blue-600 underline">
+          Open Chat →
+        </Link>
+        <button
+          onClick={() => toggleBookmark(session.id!, !!session.bookmarked)}
+          className="text-gray-400 hover:text-blue-500"
+          aria-label="Toggle bookmark"
+        >
+          {session.bookmarked ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,32 +148,11 @@ export default function SessionsPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
         {pageData.map((session) => (
-          <div
+          <SessionCardWithTimer
             key={session.id}
-            className="group relative rounded-lg border p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <h2 className="mb-1 text-lg font-semibold">{session.title}</h2>
-            <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-              {new Date(session.created_at!).toLocaleString()}
-            </p>
-            {session.summary && (
-              <p className="mb-2 line-clamp-3 text-sm text-gray-600 dark:text-gray-300">
-                {session.summary}
-              </p>
-            )}
-            <div className="mt-4 flex items-center justify-between">
-              <Link href={`/chat/${session.id}`} className="text-sm text-blue-600 underline">
-                Open Chat →
-              </Link>
-              <button
-                onClick={() => toggleBookmark(session.id!, !!session.bookmarked)}
-                className="text-gray-400 hover:text-blue-500"
-                aria-label="Toggle bookmark"
-              >
-                {session.bookmarked ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
-              </button>
-            </div>
-          </div>
+            session={session}
+            toggleBookmark={toggleBookmark}
+          />
         ))}
       </div>
       {totalPages > 1 && (

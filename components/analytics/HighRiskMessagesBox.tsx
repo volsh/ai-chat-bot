@@ -35,7 +35,7 @@ export default function HighRiskMessagesBox({
         <div key={msg.source_id} className="flex flex-col rounded bg-gray-50 p-2 dark:bg-gray-700">
           <div className="font-medium text-gray-900 dark:text-gray-100">{msg.content}</div>
           <div className="mt-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>{format(new Date(msg.tagged_at), "PP p")}</span>
+            <span>{format(new Date(msg.message_created_at), "PP p")}</span>
             {msg.source_id && (
               <Link
                 href={`/chat/${msg.session_id}?messageId=${msg.source_id}`}

@@ -38,7 +38,7 @@ export default function FlaggedMessagesBox({
             {msg.content.length > 100 && "..."}
           </div>
           <div className="mt-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>{format(new Date(msg.tagged_at), "PP p")}</span>
+            <span>{format(new Date(msg.message_created_at), "PP p")}</span>
             <span>Reason: {msg.flag_reason}</span>
             {msg.session_id && (
               <Link
