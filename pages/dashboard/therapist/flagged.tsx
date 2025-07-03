@@ -212,12 +212,14 @@ export default function TherapistReviewPanel() {
 
       <CollapsibleSection title="Filters">
         <div className="flex flex-wrap items-center gap-4">
-          <Input
-            className="w-60"
-            placeholder="Search…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="self-end">
+            <Input
+              className="w-60"
+              placeholder="Search…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
           <MultiSelectFilter
             label="Emotion"
             values={filters.emotions || []}

@@ -109,14 +109,14 @@ export default function LoginPage() {
         onClick={signInWithGitHub}
         className="text-sm text-blue-600 underline dark:text-blue-400"
       >
-        Sign in with GitHub
+        Sign in as user
       </button>
 
       <button
         onClick={signInWithPassword}
         className="text-sm text-blue-600 underline dark:text-blue-400"
       >
-        Sign in with password
+        Sign in as therapist
       </button>
     </main>
   );
