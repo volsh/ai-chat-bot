@@ -1,4 +1,4 @@
-// pages/api/exports/start.ts
+// pages/api/exports/export-fine-tune.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createSupabaseServerClient } from "@/libs/supabase";
 import { exportTrainingData } from "@/utils/ai/exportTrainingData";
