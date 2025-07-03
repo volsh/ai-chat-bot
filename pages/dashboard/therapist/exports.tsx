@@ -196,13 +196,15 @@ export default function ExportTrainingScreen() {
               onChange={(checked) => setFilters((f) => ({ ...f, highRiskOnly: checked }))}
             />
           </div>
+          <div className="self-end justify-self-end">
+            <ClearFiltersButton onClick={() => setFilters(defaultFilters)} />
+          </div>
         </div>
       )}
       <div className="mt-5 flex justify-between">
         <div className="badge">
           Selected {selectedCount} out of {totalAnnotations}
         </div>
-        {showAdvanced && <ClearFiltersButton onClick={() => setFilters(defaultFilters)} />}
       </div>
       {exportLocked && (
         <div className="mt-4 rounded bg-red-100 p-2 text-sm text-red-800">

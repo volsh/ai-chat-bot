@@ -211,7 +211,7 @@ export default function TherapistReviewPanel() {
       />
 
       <CollapsibleSection title="Filters">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="self-end">
             <Input
               className="w-60"
@@ -264,18 +264,20 @@ export default function TherapistReviewPanel() {
             tooltip="Display entries with selected AI/human agreement ratio"
             tooltipId="aiAgreementTooltip"
           />
-          <Toggle
-            label="High Risk Only"
-            tooltip="Only show messages marked with high severity"
-            tooltipId="highRiskOnlyTooltip"
-            checked={filters.highRiskOnly || false}
-            onChange={(v) => setFilter("highRiskOnly", v)}
-          />
-          <Toggle
-            label="Flagged Only"
-            checked={filters.flaggedOnly || false}
-            onChange={(v) => setFilter("flaggedOnly", v)}
-          />
+          <div className="flex gap-5">
+            <Toggle
+              label="High Risk Only"
+              tooltip="Only show messages marked with high severity"
+              tooltipId="highRiskOnlyTooltip"
+              checked={filters.highRiskOnly || false}
+              onChange={(v) => setFilter("highRiskOnly", v)}
+            />
+            <Toggle
+              label="Flagged Only"
+              checked={filters.flaggedOnly || false}
+              onChange={(v) => setFilter("flaggedOnly", v)}
+            />
+          </div>
           <MultiSelectFilter
             label="Flag reason"
             values={filters.flagReasons || []}
@@ -324,9 +326,11 @@ export default function TherapistReviewPanel() {
               { label: "By Max Intensity", value: "intensity" },
             ]}
           />
-          <div className="self-end">
+          <div className="absolute bottom-0 right-0">
             <ClearFiltersButton onClick={resetFilters} />
           </div>
+        </div>
+        <div className="mt-8 flex justify-end gap-4">
           <button
             onClick={handleExport}
             className="inline-flex items-center gap-2 self-end border px-3 py-1 text-sm"

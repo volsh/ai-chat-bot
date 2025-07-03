@@ -21,9 +21,7 @@ export default function Toggle({ label, checked, onChange, tooltip, tooltipId }:
       />
       {tooltip ? (
         <div className="flex items-center gap-2">
-          <label htmlFor="score-cutoff" className="text-sm font-medium">
-            {label}
-          </label>
+          {label}
           <span
             data-tooltip-id={tooltipId}
             data-tooltip-place="top"
