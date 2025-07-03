@@ -190,6 +190,8 @@ export default function ExportTrainingScreen() {
             />
             <Toggle
               label="High Risk Only"
+              tooltip="Only export messages marked with high severity"
+              tooltipId="highRiskOnlyTooltip"
               checked={filters.highRiskOnly || false}
               onChange={(checked) => setFilters((f) => ({ ...f, highRiskOnly: checked }))}
             />

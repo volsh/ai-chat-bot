@@ -263,17 +263,9 @@ export default function TherapistReviewPanel() {
             tooltipId="aiAgreementTooltip"
           />
           <Toggle
-            label={
-              <span className="inline-flex items-center gap-1">
-                High Risk Only
-                <span
-                  className="cursor-help text-gray-400"
-                  title="Only show messages marked with high severity"
-                >
-                  ⓘ
-                </span>
-              </span>
-            }
+            label="High Risk Only"
+            tooltip="Only show messages marked with high severity"
+            tooltipId="highRiskOnlyTooltip"
             checked={filters.highRiskOnly || false}
             onChange={(v) => setFilter("highRiskOnly", v)}
           />
