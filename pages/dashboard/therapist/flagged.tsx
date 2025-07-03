@@ -260,6 +260,7 @@ export default function TherapistReviewPanel() {
             value={[filters.agreement?.[0], filters.agreement?.[1]] as [number, number]}
             onChange={(v) => setFilter("agreement", v)}
             tooltip="Display entries with selected AI/human agreement ratio"
+            tooltipId="aiAgreementTooltip"
           />
           <Toggle
             label={
