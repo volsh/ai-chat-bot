@@ -254,11 +254,12 @@ export default function TherapistReviewPanel() {
           />
           <Slider
             type="range"
-            label="Min Agreement %"
+            label="AI Agreement %"
             min={0}
             max={100}
             value={[filters.agreement?.[0], filters.agreement?.[1]] as [number, number]}
             onChange={(v) => setFilter("agreement", v)}
+            tooltip="Display entries with selected AI/human agreement ratio"
           />
           <Toggle
             label={
