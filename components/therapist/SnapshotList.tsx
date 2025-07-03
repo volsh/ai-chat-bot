@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { toast } from "react-hot-toast";
 import StatusBadge from "../StatusBadge";
 import { Tooltip } from "react-tooltip";
+import ProgressBar from "../ui/ProgressBar";
 
 const SNAPSHOTS_PER_PAGE = 10;
 
@@ -19,7 +20,7 @@ export default function SnapshotList() {
     const loadSnapshots = async () => {
       const { data, error, count } = await supabase
         .from("fine_tune_snapshots")
-        .select("id, created_at, version, filters, job_status", { count: "exact" })
+        .select("id, created_at, version, filters, job_status, retry_count", { count: "exact" })
         .order("created_at", { ascending: false })
         .range((currentPage - 1) * SNAPSHOTS_PER_PAGE, currentPage * SNAPSHOTS_PER_PAGE - 1);
 
@@ -29,7 +30,7 @@ export default function SnapshotList() {
       }
 
       setSnapshots(data || []);
-      setTotalPages(Math.ceil((count ?? SNAPSHOTS_PER_PAGE) / SNAPSHOTS_PER_PAGE)); // Calculate total pages
+      setTotalPages(Math.ceil((count ?? SNAPSHOTS_PER_PAGE) / SNAPSHOTS_PER_PAGE));
       setLoading(false);
     };
 
@@ -40,12 +41,19 @@ export default function SnapshotList() {
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          event: "*",
           schema: "public",
           table: "fine_tune_snapshots",
         },
         (payload) => {
-          setSnapshots((prev) => prev.map((s) => (s.id === payload.new.id ? payload.new : s)));
+          if (payload.eventType === "INSERT") {
+            setSnapshots((prev) => [payload.new, ...prev].slice(0, SNAPSHOTS_PER_PAGE));
+            setTotalPages((prev) =>
+              Math.ceil((prev * SNAPSHOTS_PER_PAGE + 1) / SNAPSHOTS_PER_PAGE)
+            );
+          } else if (payload.eventType === "UPDATE") {
+            setSnapshots((prev) => prev.map((s) => (s.id === payload.new.id ? payload.new : s)));
+          }
         }
       )
       .subscribe();
@@ -53,7 +61,7 @@ export default function SnapshotList() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentPage]); // Re-fetch when currentPage changes
+  }, [currentPage]);
 
   if (loading) return <p className="text-sm text-gray-400">Loading snapshots…</p>;
 
@@ -82,24 +90,25 @@ export default function SnapshotList() {
                 {format(new Date(s.created_at), "PPPp")}
               </span>
             </div>
+            <div className="mt-2">
+              <ProgressBar status={s.job_status} retryCount={s.retry_count || 0} />
+            </div>
             <div className="mt-2 break-words text-xs text-zinc-500">
-              <div className="mt-2 break-words text-xs text-zinc-500">
-                <strong>Filters:</strong>{" "}
-                {Object.keys(s.filters || {}).length === 0 ? (
-                  <span className="text-zinc-400">None</span>
-                ) : (
-                  <details className="mt-1">
-                    <summary className="cursor-pointer text-xs underline">View Filters</summary>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-100">
-                      {Object.entries(s.filters || {}).map(([key, val]) => (
-                        <span key={key} className="rounded bg-zinc-700 px-2 py-1">
-                          {key}: {Array.isArray(val) ? val.join(", ") : val?.toString()}
-                        </span>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </div>
+              <strong>Filters:</strong>{" "}
+              {Object.keys(s.filters || {}).length === 0 ? (
+                <span className="text-zinc-400">None</span>
+              ) : (
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-xs underline">View Filters</summary>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-100">
+                    {Object.entries(s.filters || {}).map(([key, val]) => (
+                      <span key={key} className="rounded bg-zinc-700 px-2 py-1">
+                        {key}: {Array.isArray(val) ? val.join(", ") : val?.toString()}
+                      </span>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           </li>
         ))}

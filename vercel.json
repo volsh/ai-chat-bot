@@ -2,7 +2,12 @@
   "version": 2,
   "builds": [{ "src": "next.config.js", "use": "@vercel/next" }],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1.js" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/(.*)", "dest": "/" }
-  ]
+  ],
+  "functions": {
+    "api/*.ts": {
+      "runtime": "edge"
+    }
+  }
 }

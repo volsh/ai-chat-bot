@@ -3,7 +3,8 @@ import OpenAI from "openai";
 import { createSupabaseServerClient } from "@/libs/supabase";
 import { exportTrainingData } from "@/utils/ai/exportTrainingData";
 import { v4 as uuidv4 } from "uuid";
-import pollFineTuneStatus from "@/utils/ai/pollFineTuneStatus";
+import kickoffPollFineTuneStatus from "@/utils/ai/kickoffPollFineTuneStatus";
+import getFilterHash from "@/utils/ai/getFilterHash";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -15,6 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     auto_retry = false,
     retry_origin = "manual",
   } = req.body;
+
   const supabase = createSupabaseServerClient(req, res);
   const { data: userData } = await supabase.auth.getUser();
   const user = userData?.user;
@@ -59,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Snapshot already completed" });
     }
 
-    // ✅ Cooldown check (5 minutes)
+    // ✅ Cooldown check
     const { data: recent } = await supabase
       .from("fine_tune_events")
       .select("created_at")
@@ -73,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
 
     const { data: existingLock } = await supabase
       .from("fine_tune_locks")
@@ -85,24 +87,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (existingLock) {
       return res.status(409).json({ error: "Retry already in progress" });
     }
-    const csvString = await exportTrainingData(supabase, snapshot.filters);
 
-    if (!(snapshot.file_path && snapshot.file_uploaded_at)) {
-      const fileName = `fine-tune/retry-${uuidv4()}.csv`;
-      await supabase.storage
-        .from("exports")
-        .upload(fileName, csvString, { contentType: "text/csv", upsert: true });
-    }
+    // ✅ Export as JSONL for OpenAI
+    const jsonlString = await exportTrainingData(supabase, snapshot.filters);
+    const buffer = Buffer.from(jsonlString, "utf8");
 
-    const openaiRes = await openai.files.create({
-      file: new File([Buffer.from(csvString)], "retry-data.csv", {
-        type: "text/csv;charset=utf-8",
-      }),
+    const openaiFile = await openai.files.create({
+      file: new File([buffer], "retry-data.jsonl", { type: "application/jsonl" }),
       purpose: "fine-tune",
     });
 
     const job = await openai.fineTuning.jobs.create({
-      training_file: openaiRes.id,
+      training_file: openaiFile.id,
       model: snapshot.model_version,
     });
 
@@ -110,11 +106,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await supabase.from("fine_tune_locks").upsert({
       snapshot_id: snapshotId,
       user_id: user.id,
-      expires_at: expiresAt,
-      locked_until: expiresAt,
-      context: retry_origin || "manual",
+      expires_at: expiresAt.toISOString(),
+      locked_until: expiresAt.toISOString(),
+      context: retry_origin,
     });
 
+    // Update snapshot version and retry count
     const version = new Date().toISOString().replace(/[:.]/g, "-");
 
     await supabase
@@ -122,15 +119,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .update({
         retry_count: (snapshot.retry_count || 0) + 1,
         version,
+        file_id: openaiFile.id,
+        file_name: openaiFile.filename,
+        job_status: job.status,
+        file_uploaded_at: now.toISOString(),
       })
       .eq("id", snapshotId);
 
-    // 🧠 Background poller to call edge function
-    pollFineTuneStatus(snapshotId, job.id, supabase);
+    await supabase.from("fine_tune_events").insert({
+      snapshot_id: snapshotId,
+      job_id: job.id,
+      user_id: user.id,
+      status: "retry_started",
+      model_version: snapshot.model_version,
+      error: null,
+      message: `Retry triggered via ${retry_origin}`,
+      retry_reason,
+      auto_retry,
+    });
 
-    res.status(200).json({ success: true, jobId: job.id });
+    // 🧠 Background poller for immediate status update
+    kickoffPollFineTuneStatus(snapshotId, job.id, supabase);
+
+    return res.status(200).json({ success: true, jobId: job.id });
   } catch (err: any) {
     console.error("Retry job failed", err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 }

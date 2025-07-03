@@ -1,3 +1,4 @@
+// pages/api/exports/start.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createSupabaseServerClient } from "@/libs/supabase";
 import { exportTrainingData } from "@/utils/ai/exportTrainingData";
@@ -7,7 +8,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import getFilterHash from "@/utils/ai/getFilterHash";
-import pollFineTuneStatus from "@/utils/ai/pollFineTuneStatus";
+import kickoffPollFineTuneStatus from "@/utils/ai/kickoffPollFineTuneStatus";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -23,33 +24,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const filterHash = getFilterHash(filters);
 
   try {
-    const { data: existingFilterHash } = await supabase
-      .from("fine_tune_snapshots")
-      .select("id")
-      .eq("filter_hash", filterHash)
-      .limit(1)
-      .maybeSingle();
-
-    const { data: latestSnapshot } = await supabase
-      .from("fine_tune_snapshots")
-      .select("created_at")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    const { data: lastChange } = await supabase
-      .from("emotion_log_changes")
-      .select("change_timestamp")
-      .order("change_timestamp", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (lastChange?.change_timestamp <= latestSnapshot?.created_at && existingFilterHash?.id) {
-      return res.status(423).json({ error: "A snapshot with the same filters already exists." });
-    }
-
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
+
+    const [{ data: existingSnapshot }, { data: latestSnapshot }, { data: lastChange }] =
+      await Promise.all([
+        supabase
+          .from("fine_tune_snapshots")
+          .select("id")
+          .eq("filter_hash", filterHash)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("fine_tune_snapshots")
+          .select("created_at")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single(),
+        supabase
+          .from("emotion_log_changes")
+          .select("change_timestamp")
+          .order("change_timestamp", { ascending: false })
+          .limit(1)
+          .single(),
+      ]);
+
+    if (lastChange?.change_timestamp <= latestSnapshot?.created_at && existingSnapshot?.id) {
+      return res.status(423).json({ error: "A snapshot with the same filters already exists." });
+    }
 
     const { data: recentLock } = await supabase
       .from("fine_tune_locks")
@@ -60,11 +62,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .limit(1)
       .single();
 
-    const lastExport = recentLock?.created_at ? new Date(recentLock.created_at) : new Date(0); // Fallback to epoch (0) if no created_at
-
-    // Check if the lock was set within the last 5 minutes
+    const lastExport = recentLock?.created_at ? new Date(recentLock.created_at) : new Date(0);
     if (recentLock && now.getTime() - lastExport.getTime() < 5 * 60 * 1000) {
-      return res.status(423).json({ locked: true, expiresAt }); // Use 423 Locked to indicate the resource is temporarily locked
+      return res.status(423).json({ locked: true, expiresAt });
     }
 
     const jsonString = await exportTrainingData(supabase, filters);
@@ -85,7 +85,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     fs.unlinkSync(tmpPath);
 
     const version = new Date().toISOString().replace(/[:.]/g, "-");
-    console.log("fineTuneJob", fineTuneJob);
 
     const { data: newSnapshot, error: snapshotError } = await supabase
       .from("fine_tune_snapshots")
@@ -100,15 +99,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         file_path: fileName,
         file_name: openaiFile.filename,
         file_id: openaiFile.id,
+        job_id: fineTuneJob.id,
         job_status: fineTuneJob.status,
         file_uploaded_at: now.toISOString(),
       })
       .select()
       .single();
 
-    if (snapshotError) {
-      throw new Error(snapshotError.message);
+    if (snapshotError || !newSnapshot) {
+      throw new Error(snapshotError?.message || "Snapshot creation failed");
     }
+
     const { error: lockError } = await supabase.from("fine_tune_locks").upsert({
       snapshot_id: newSnapshot.id,
       user_id: user.id,
@@ -116,14 +117,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       expires_at: expiresAt.toISOString(),
       locked_until: expiresAt.toISOString(),
     });
-    console.log("lockError", lockError);
 
-    if (lockError) {
-      throw new Error(lockError.message);
-    }
+    if (lockError) throw new Error(lockError.message);
 
-    // 🧠 Background poller to call edge function
-    pollFineTuneStatus(newSnapshot.id, fineTuneJob.id, supabase);
+    kickoffPollFineTuneStatus(newSnapshot.id, fineTuneJob.id, supabase);
 
     return res.status(200).json({
       success: true,

@@ -1,10 +1,14 @@
-// supabase/functions/notify-fine-tune-status/index.ts
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-function delay(ms) {
+import OpenAI from "https://esm.sh/openai@4.26.0";
+
+const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")! });
+
+function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-async function retryWithBackoff(fn, retries = 3, delayMs = 1000) {
+
+async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
   let lastError;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -16,163 +20,156 @@ async function retryWithBackoff(fn, retries = 3, delayMs = 1000) {
   }
   throw lastError;
 }
-serve(async (req) => {
-  try {
-    console.log("envoked");
-    const body = await req.json();
-    const jobId = body.id;
-    const snapshotId = body.snapshotId;
-    const status = body.status;
-    const error = body.error;
 
-    console.log("snapshotId", snapshotId);
-    console.log("status", status);
-    console.log("error", error);
-    if (!jobId || !snapshotId)
-      return new Response("Missing params", {
-        status: 400,
-      });
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL"),
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-    );
-    const { data: snapshot, error: updateError } = await supabase
+type FineTuneJob = {
+  id: string;
+  status: string;
+  model: string;
+  error?: { message: string };
+};
+
+serve(async (_req) => {
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  try {
+    const { data: snapshots, error } = await supabase
       .from("fine_tune_snapshots")
-      .update({
-        job_status: status,
-        completed_at:
-          status === "succeeded" || status === "failed" ? new Date(Date.now()).toISOString() : null,
-      })
-      .eq("id", snapshotId)
-      .select("id, user_id, retry_count, job_status")
-      .single();
-    if (updateError || !snapshot) {
-      console.error("Failed to update status or locate snapshot:", updateError);
-      return new Response("Snapshot update error", {
-        status: 500,
-      });
+      .select("id, job_status, file_id, file_name, user_id, model_version, retry_count")
+      .in("job_status", ["running", "pending", "uploading", "validating_files"]);
+
+    if (error) throw error;
+    if (!snapshots?.length) {
+      console.log("No pending jobs");
+      return new Response("OK", { status: 200 });
     }
-    const { user_id, retry_count, job_status } = snapshot;
-    if ((snapshot.retry_count || 0) >= 3 && status !== "succeeded") {
-      console.log("Retry limit reached ");
-      await supabase
-        .from("fine_tune_snapshots")
-        .update({
-          job_status: "failed",
-          completed_at: new Date(Date.now()).toISOString(),
-        })
-        .eq("id", snapshotId);
-      await supabase.from("fine_tune_events").upsert(
-        [
-          {
-            job_id: jobId,
-            snapshot_id: snapshotId,
-            user_id,
-            status: "failed",
-            model_version: body.model,
-            error: "Retry limit reached (3)",
-            message: `Job ${status}`,
-            auto_retry: true,
-          },
-        ],
-        {
-          onConflict: "job_id,status",
-          ignoreDuplicates: true,
-        }
-      );
-      return new Response("Retry limit reached (3)", {
-        status: 429,
-      });
-    }
-    // ✅ Deduplicated log event insert
-    const { error: updateEventsError } = await supabase.from("fine_tune_events").upsert(
-      [
-        {
-          job_id: jobId,
-          snapshot_id: snapshotId,
-          user_id,
-          status,
-          model_version: body.model,
-          error: body.error?.message || null,
-          message: `Job ${status}`,
-          auto_retry: true,
-        },
-      ],
-      {
-        onConflict: "job_id,status",
-        ignoreDuplicates: true,
-      }
-    );
-    console.log("Updating fine_tune_events");
-    if (updateEventsError) {
-      console.error("Failed to update fine tune events:", updateEventsError);
-    }
-    const { data: user } = await supabase.from("users").select("email").eq("id", user_id).single();
-    if (user?.email) {
-      if (status === "succeeded") {
-        console.log("Sending email success");
-        await supabase.functions.invoke("sendgrid", {
-          body: {
-            to_email: user.email,
-            subject: "🎓 Your fine-tune job succeeded!",
-            text: `Your fine-tuning job ${jobId} completed successfully.`,
-          },
-        });
-      } else if (status === "failed") {
-        console.log("Sending email failure");
-        await supabase.functions.invoke("sendgrid", {
-          body: {
-            to_email: user.email,
-            subject: "❌ Fine-tune job failed",
-            text: `Your fine-tuning job ${jobId} has failed. We will attempt an automatic retry.`,
-          },
-        });
-        const retryResponse = await retryWithBackoff(async () => {
-          console.log("Triggering retry-failed");
-          const retryUrl = `${Deno.env.get("NEXT_PUBLIC_SITE_URL")}/api/exports/retry-failed`;
-          const response = await fetch(retryUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              snapshot_id: snapshotId,
-              job_id: jobId,
-              auto_retry: true,
-              retry_reason: "Auto retry from failure webhook",
-              retry_origin: "webhook",
-            }),
-          });
-          if (!response.ok) throw new Error("Retry trigger failed");
-          return response;
-        });
-        console.log("retryResponse", retryResponse);
-        if (!retryResponse.ok) {
+
+    await Promise.all(
+      snapshots.map(async (snapshot) => {
+        try {
+          const job = (await retryWithBackoff(() =>
+            openai.fineTuning.jobs.retrieve(snapshot.file_id)
+          )) as FineTuneJob;
+
+          await supabase
+            .from("fine_tune_snapshots")
+            .update({
+              job_status: job.status,
+              completed_at:
+                job.status === "succeeded" || job.status === "failed"
+                  ? new Date().toISOString()
+                  : null,
+            })
+            .eq("id", snapshot.id);
+
           await supabase.from("fine_tune_events").upsert(
             [
               {
-                job_id: jobId,
-                snapshot_id: snapshotId,
-                user_id,
-                status: "retry_failed",
-                error: "Retry trigger failed",
-                message: "Retry attempt failed inside webhook",
+                job_id: job.id,
+                snapshot_id: snapshot.id,
+                user_id: snapshot.user_id,
+                status: job.status,
+                model_version: job.model,
+                error: job.error?.message || null,
+                message: `Job ${job.status}`,
+                auto_retry: true,
+                retry_reason: "Status update from polling edge function",
+                retry_origin: "poller",
               },
             ],
             {
               onConflict: "job_id,status",
+              ignoreDuplicates: true,
             }
           );
+
+          if (job.status === "succeeded" || job.status === "failed") {
+            const { data: user } = await supabase
+              .from("users")
+              .select("email")
+              .eq("id", snapshot.user_id)
+              .single();
+
+            if (user?.email) {
+              const subject =
+                job.status === "succeeded"
+                  ? "🎓 Your fine-tune job succeeded!"
+                  : "❌ Fine-tune job failed";
+
+              const text =
+                job.status === "succeeded"
+                  ? `Your fine-tuning job ${job.id} completed successfully.`
+                  : `Your fine-tuning job ${job.id} has failed. We will attempt an automatic retry.`;
+
+              await supabase.functions.invoke("sendgrid", {
+                body: {
+                  to_email: user.email,
+                  subject,
+                  text,
+                },
+              });
+
+              if (job.status === "failed" && (snapshot.retry_count || 0) < 3) {
+                const retryResponse = await retryWithBackoff(async () => {
+                  const retryUrl = `${Deno.env.get("NEXT_PUBLIC_SITE_URL")}/api/exports/retry-failed`;
+                  const response = await fetch(retryUrl, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      snapshot_id: snapshot.id,
+                      job_id: job.id,
+                      auto_retry: true,
+                      retry_reason: "Auto retry from polling edge function",
+                      retry_origin: "poller",
+                    }),
+                  });
+                  if (!response.ok) throw new Error("Retry trigger failed");
+                  return response;
+                });
+
+                if (!retryResponse.ok) {
+                  await supabase.from("fine_tune_events").upsert(
+                    [
+                      {
+                        job_id: job.id,
+                        snapshot_id: snapshot.id,
+                        user_id: snapshot.user_id,
+                        status: "retry_failed",
+                        error: "Retry trigger failed",
+                        message: "Retry attempt failed from polling edge function",
+                      },
+                    ],
+                    {
+                      onConflict: "job_id,status",
+                    }
+                  );
+                }
+              }
+
+              if ((snapshot.retry_count || 0) >= 3 && job.status !== "succeeded") {
+                await supabase
+                  .from("fine_tune_snapshots")
+                  .update({
+                    job_status: "failed",
+                    completed_at: new Date().toISOString(),
+                  })
+                  .eq("id", snapshot.id);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`Error polling job ${snapshot.file_id}:`, err);
         }
-      }
-    }
-    return new Response("OK", {
-      status: 200,
-    });
+      })
+    );
+
+    return new Response("Polling complete", { status: 200 });
   } catch (err) {
-    console.error("Webhook error:", err);
-    return new Response("Invalid payload", {
-      status: 400,
-    });
+    console.error("Cron error:", err);
+    return new Response("Internal error", { status: 500 });
   }
 });

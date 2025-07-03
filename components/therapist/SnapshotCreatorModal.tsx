@@ -37,7 +37,7 @@ export default function CreateSnapshotModal({
 
   return (
     <Modal onClose={onClose}>
-      {/* <h2 className="mb-2 text-lg font-semibold">📸 Create Snapshot</h2> */}
+      <h2 className="mb-2 text-lg font-semibold">📸 Create Snapshot</h2>
 
       <label className="text-sm font-medium">Snapshot Name</label>
       <Input
