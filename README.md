@@ -58,7 +58,7 @@ npm run dev
 Create `.env.local` and fill in:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_PROJECT_REF
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 OPENAI_API_KEY=
 SUPABASE_SERVICE_ROLE_KEY=   # required for edge functions

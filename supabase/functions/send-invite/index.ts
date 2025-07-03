@@ -5,7 +5,7 @@ serve(async (req) => {
   const { to_email, from_name, session_title, link, inviter_id, team_id } = await req.json();
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL"),
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+    Deno.env.get("SERVICE_ROLE_KEY")
   );
   // Rate limit: 10 per hour
   const inviterCount = await supabase

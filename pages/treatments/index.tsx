@@ -227,9 +227,9 @@ export default function TreatmentsPage() {
           {pageData.map((t) => (
             <div
               key={t.id}
-              className={`flex items-center justify-between rounded-lg border p-4 transition hover:shadow-lg ${t.archived ? "bg-gray-100 dark:bg-gray-800" : ""}`}
+              className={`flex items-center justify-between gap-2 rounded-lg border p-4 transition hover:shadow-lg ${t.archived ? "bg-gray-100 dark:bg-gray-800" : ""}`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex flex-1 items-center gap-3">
                 <input
                   type="checkbox"
                   checked={selected.includes(t.id)}

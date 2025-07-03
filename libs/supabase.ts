@@ -4,7 +4,7 @@ import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { serialize } from "cookie";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseUrl = `https://${process.env.NEXT_PUBLIC_PROJECT_REF}.supabase.co`;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabaseRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
