@@ -182,16 +182,6 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
         clearInterval(interval);
         setIsExpired(true);
         setCountdown(null);
-
-        supabase
-          .from("sessions")
-          .update({ ended_at: new Date().toISOString() })
-          .eq("id", sessionId)
-          .then(({ error }) => {
-            if (error) {
-              console.error("Error updating ended_at:", error);
-            }
-          });
       } else {
         setCountdown(remaining);
       }

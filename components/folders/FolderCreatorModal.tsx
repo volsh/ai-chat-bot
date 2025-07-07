@@ -130,7 +130,7 @@ export default function FolderCreatorModal({ onRefresh, onClose }: FolderCreator
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="mt-1 h-10 w-16 rounded border dark:bg-zinc-700"
+                className="mt-1 h-10 w-16 rounded border px-0 py-0 dark:bg-zinc-700"
               />
             </div>
           </div>

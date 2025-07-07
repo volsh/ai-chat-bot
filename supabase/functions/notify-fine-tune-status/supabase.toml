@@ -1,5 +1,0 @@
-# supabase/functions/notify-fine-tune-status/supabase.toml
-name = "notify-fine-tune-status"
-
-[schedule]
-cron = "*/5 * * * *"

@@ -330,7 +330,7 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              className="h-10 w-16 rounded border dark:bg-zinc-800"
+              className="h-10 w-16 rounded border px-0 py-0 dark:bg-zinc-800"
             />
           </div>
         </div>

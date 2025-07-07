@@ -47,26 +47,28 @@ set
 COMMENT on SCHEMA public is 'standard public schema';
 
 --
--- Name: call_poll_fn(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: call_poll_fn(); Type: FUNCTION; Schema: public; Owner: -. please enter the relevant secrets to the vault in supabase dashaboard
 --
-create function public.call_poll_fn ()
-returns void
-language plpgsql
-as $$
-declare
-  project_ref text := current_setting('supabase.functions.secret.PROJECT_REF', true);
-  service_role text := current_setting('supabase.functions.secret.SERVICE_ROLE_KEY', true);
-  fn_url text := format('https://%s.functions.supabase.co/notify-fine-tune-status', project_ref);
-begin
-  perform net.http_post(
-    url := fn_url,
+create or replace function call_poll_fn()
+returns void language sql as $$
+select
+  net.http_post(
+    url := (
+      select decrypted_secret
+      from vault.decrypted_secrets
+      where name = 'project_url'
+    ) || '/functions/v1/notify-fine-tune-status',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', format('Bearer %s', service_role)
+      'Authorization', 'Bearer ' || (
+        select decrypted_secret
+        from vault.decrypted_secrets
+        where name = 'service_role'
+      )
     )
   );
-end;
 $$;
+
 
 
 --
@@ -178,20 +180,36 @@ returns trigger
 language plpgsql
 as $$
 declare
+  project_ref text;
+  service_role_key text;
   frontend_url text;
-  project_ref text := current_setting('supabase.functions.secret.PROJECT_REF', true);
-  service_role_key text := current_setting('supabase.functions.secret.SERVICE_ROLE_KEY', true);
-  fn_url text := format('https://%s.functions.supabase.co/send_email_on_end', project_ref);
+  fn_url text;
 begin
+  -- Only act when the session is ending
   if NEW.ended_at is not null and OLD.ended_at is null then
-    -- Get the frontend URL from your settings table
-    select value into frontend_url
-    from settings
-    where key = 'FRONTEND_URL';
+    -- Load secrets from Vault
+    select decrypted_secret into project_ref
+    from vault.decrypted_secrets
+    where name = 'project_ref';
+
+    select decrypted_secret into service_role_key
+    from vault.decrypted_secrets
+    where name = 'service_role_key';
+
+    select decrypted_secret into frontend_url
+    from vault.decrypted_secrets
+    where name = 'frontend_url';
+
+    if project_ref is null or service_role_key is null or frontend_url is null then
+      raise exception 'Missing required Vault secrets.';
+    end if;
+
+    -- Construct function URL
+    fn_url := format('https://%s.functions.supabase.co/send_email_on_end', project_ref);
 
     raise notice 'Trigger fired for session id %', NEW.id;
 
-    -- Perform the HTTP POST using net.http_post
+    -- Perform the HTTP POST
     perform net.http_post(
       url := fn_url,
       headers := jsonb_build_object(
@@ -695,33 +713,6 @@ group by user_id;
 $$;
 
 --
--- Name: notify_fine_tune_job_update(); Type: FUNCTION; Schema: public; Owner: -
---
-create function public.notify_fine_tune_job_update () RETURNS trigger LANGUAGE plpgsql as $$
-
-begin
-
-  if new.job_status != old.job_status and new.job_status = 'succeeded' then
-
-    perform net.http_post(
-
-      url := 'https://YOUR_PROJECT.functions.supabase.co/notify-fine-tune-status',
-
-      headers := json_build_object('Content-Type', 'application/json'),
-
-      body := row_to_json(new)::text
-
-    );
-
-  end if;
-
-  return new;
-
-end;
-
-$$;
-
---
 -- Name: set_team_from_invite(); Type: FUNCTION; Schema: public; Owner: -
 --
 create function public.set_team_from_invite () RETURNS trigger LANGUAGE plpgsql as $$
@@ -946,6 +937,23 @@ set
 
 set
   default_table_access_method = heap;
+
+--
+-- Name: end_expired_sessions(); Type: FUNCTION; Schema: public; Owner: -
+--
+create or replace function public.end_expired_sessions()
+returns void
+language plpgsql
+as $$
+begin
+  update sessions
+  set ended_at = now()
+  where ended_at is null
+    and paused_at is null
+    and created_at + interval '2 hours' + coalesce(make_interval(secs => total_pause_seconds), interval '0') <= now();
+end;
+$$;
+
 
 --
 -- Name: annotations; Type: TABLE; Schema: public; Owner: -
@@ -2707,15 +2715,6 @@ grant all on FUNCTION public.list_therapist_clients (therapist_uuid uuid) to ano
 grant all on FUNCTION public.list_therapist_clients (therapist_uuid uuid) to authenticated;
 
 grant all on FUNCTION public.list_therapist_clients (therapist_uuid uuid) to service_role;
-
---
--- Name: FUNCTION notify_fine_tune_job_update(); Type: ACL; Schema: public; Owner: -
---
-grant all on FUNCTION public.notify_fine_tune_job_update () to anon;
-
-grant all on FUNCTION public.notify_fine_tune_job_update () to authenticated;
-
-grant all on FUNCTION public.notify_fine_tune_job_update () to service_role;
 
 --
 -- Name: FUNCTION set_team_from_invite(); Type: ACL; Schema: public; Owner: -

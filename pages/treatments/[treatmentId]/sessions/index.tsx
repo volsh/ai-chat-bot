@@ -182,8 +182,14 @@ export default function SessionsPage() {
         <p className="mt-8 text-center text-gray-400">No sessions match your search criteria.</p>
       )}
 
-      {/* If there are absolutely no active sessions in this treatment */}
-      {(sessions.length === 0 || !sessions.find((s) => !s.ended_at)) && (
+      {/* Show "Start New Session" if no sessions are active based on time logic */}
+      {(sessions.length === 0 ||
+        !sessions.some((s) => {
+          const created = new Date(s.created_at).getTime();
+          const paused = s.total_pause_seconds ? s.total_pause_seconds * 1000 : 0;
+          const endsAt = created + 2 * 60 * 60 * 1000 + paused;
+          return Date.now() < endsAt;
+        })) && (
         <div className="mt-8 flex flex-col items-center justify-center gap-3 text-gray-400">
           <p>No active sessions found for this treatment. Get started by creating one!</p>
           <Button variant="primary" onClick={() => startNewChat(treatmentId as string)}>
