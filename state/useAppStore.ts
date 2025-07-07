@@ -1,6 +1,5 @@
 import { UserProfile } from "@/types";
 import { create } from "zustand";
-import { supabaseBrowserClient as supabase } from "@/libs/supabase";
 import type { Session, User } from "@supabase/supabase-js";
 
 interface AppState {

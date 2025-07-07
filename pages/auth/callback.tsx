@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
 import toast from "react-hot-toast";
-import useRedirectToChat from "@/hooks/useRedirectToChat";
 import { useAppStore } from "@/state";
 import { useSearchParams } from "next/navigation";
 import { useShallow } from "zustand/react/shallow";
@@ -14,7 +13,6 @@ export default function AuthCallback() {
   const error = searchParams.get("error");
   const next = searchParams.get("next"); // preserve deep redirect
 
-  const { redirectToChat } = useRedirectToChat();
   const { session, userProfile, loadingProfile } = useAppStore(
     useShallow((s) => ({
       session: s.session,
@@ -57,7 +55,6 @@ export default function AuthCallback() {
         return router.replace("/dashboard/therapist");
       }
 
-      // redirectToChat();
       return router.replace("/treatments");
     };
 

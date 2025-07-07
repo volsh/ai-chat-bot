@@ -12,7 +12,6 @@ import Breadcrumb from "@/components/navigation/Breadcrumb";
 import { Analytics } from "@vercel/analytics/next";
 
 import "../styles/global.css";
-import { useShallow } from "zustand/react/shallow";
 import { useUserProfileSubscription } from "@/hooks/useUserProfileSubscription";
 
 function MyApp({ Component, pageProps }: AppProps) {
