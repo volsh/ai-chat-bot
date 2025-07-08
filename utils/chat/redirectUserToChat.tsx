@@ -28,7 +28,7 @@ export const redirectUserToChat = async (context: GetServerSidePropsContext) => 
       .in("treatment_id", treatmentIds)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     sessionId = lastSession?.id;
   }

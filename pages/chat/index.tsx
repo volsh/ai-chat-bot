@@ -2,7 +2,6 @@ import { GetServerSidePropsContext, NextApiRequest, NextApiResponse } from "next
 import { redirectUserToChat } from "@/utils/chat/redirectUserToChat";
 import ssrGuard from "@/utils/auth/ssrGuard";
 import { createSupabaseServerClient } from "@/libs/supabase";
-import { Session } from "inspector/promises";
 import { SessionWithGoal } from "@/types";
 import { PostgrestError } from "@supabase/supabase-js";
 

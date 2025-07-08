@@ -162,9 +162,6 @@ export default function SessionSidebar({
 
   const renderFolder = (node: FolderNode, depth = 0) => (
     <div key={node.id}>
-      {/* =========================
-             FOLDER HEADER
-         ========================= */}
       <Draggable draggableId={node.id.toString()} index={depth}>
         {(folderProvided) => (
           <div ref={folderProvided.innerRef} {...folderProvided.draggableProps}>

@@ -181,7 +181,7 @@ language plpgsql
 as $$
 declare
   project_ref text;
-  service_role_key text;
+  service_role text;
   frontend_url text;
   fn_url text;
 begin
@@ -192,15 +192,15 @@ begin
     from vault.decrypted_secrets
     where name = 'project_ref';
 
-    select decrypted_secret into service_role_key
+    select decrypted_secret into service_role
     from vault.decrypted_secrets
-    where name = 'service_role_key';
+    where name = 'service_role';
 
     select decrypted_secret into frontend_url
     from vault.decrypted_secrets
     where name = 'frontend_url';
 
-    if project_ref is null or service_role_key is null or frontend_url is null then
+    if project_ref is null or service_role is null or frontend_url is null then
       raise exception 'Missing required Vault secrets.';
     end if;
 
@@ -214,7 +214,7 @@ begin
       url := fn_url,
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', format('Bearer %s', service_role_key)
+        'Authorization', format('Bearer %s', service_role)
       ),
       body := jsonb_build_object(
         'session_id', NEW.id,
@@ -3609,9 +3609,613 @@ select
 truncate,
 update on table public.v_snapshot_status to service_role;
 
-INSERT INTO "public"."goal_categories" ("id", "name", "description", "created_at", "updated_at") VALUES ('2ce121d5-fece-4bfa-9157-3bc1ee3e7731', 'Cognitive Goals', 'Challenging thinking patterns and building mental clarity', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('3e9b34c3-6975-4e44-b3d3-865b925b5fbb', 'Trauma & Healing', 'Processing trauma and building safety', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('454db690-41bf-4ba1-acbc-1224c56d6440', 'Life Transition Goals', 'Adapting to new roles and life changes', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('57919896-cf20-46b2-a804-092dc8a3892d', 'Behavioral Goals', 'Developing better habits and routines', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('7030b9af-9e1b-467b-ac8b-eedee7559065', 'Self‑Awareness & Personal Growth', 'Understanding and developing oneself', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('cf9a8e78-3724-4b90-8f1d-9574fc6c17a0', 'Mindset & Well‑being', 'Fostering resilience, balance, and quality of life', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('d4fce785-3c4e-4087-82e7-0c19589f8d44', 'Relationship & Social Goals', 'Improving connections with others', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('e91c71c2-ce5f-43e8-bd25-574133e956f6', 'Emotional Regulation', 'Managing feelings like anxiety, anger, and depression', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00');
-INSERT INTO "public"."goals" ("id", "title", "description", "created_at", "updated_at") VALUES ('0984eebb-4200-4707-9cb4-a2863a8af1e1', 'Minimize addictive or harmful behavior', 'Develop coping strategies for addiction and harmful habits', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('0e209d19-0e43-4939-9be4-7c2c9f9f01bc', 'Develop relaxation and mindfulness practices', 'Develop relaxation techniques and mindfulness habits', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('191c01d1-93d3-4ad3-8f3a-aeefe66abd10', 'Reduce anxiety', 'Develop strategies to decrease feelings of anxiety', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('1a192f43-0290-4f22-96d2-9fa8b794a91d', 'Establish or maintain boundaries', 'Develop the ability to set and respect boundaries', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('1a75f437-d027-4b1b-889b-14e52239128c', 'Increase social connections', 'Develop habits and skills for nurturing connections', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('1be09ae8-813d-4180-b3a6-a9acb51e8c76', 'Integrate trauma narratives in a healthy way', 'Develop methods for processing and integrating trauma narratives', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('1d335213-d2c5-4dca-821b-a8dc8242ba2a', 'Enhance productivity and focus', 'Develop habits for increased efficiency and productivity', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('20b5eb65-c80b-472a-8765-4c0fa4a6241e', 'Build better habits (sleep, exercise, routine)', 'Develop consistent habits for overall well‑being', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('22817c89-2d34-4628-8b77-10358b9bd998', 'Develop problem‑solving strategies', 'Develop structured approaches to problem‑solving', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('2d36ddbb-1c33-40b7-9b21-18cc15b7fab4', 'Maintain balance during relocations or moves', 'Develop strategies for maintaining stability during moves', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('2f4b4c35-33ee-49f2-8fe3-8ab241ff5afc', 'Improve communication with partner/family', 'Develop effective communication skills for closer relationships', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('3253cde7-0b84-4833-b5e9-bc0e7a334cc2', 'Build resilience through divorce or separation', 'Develop habits and coping strategies for navigating separation', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('32632c5f-5892-4c23-bbf7-86d638cec10b', 'Maintain consistency and discipline', 'Develop structures and accountability for sustaining habits', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('38fb5068-b5e7-4aa4-83ba-66f047c28c59', 'Reduce conflict or tension', 'Develop tools to de-escalate conflict and reduce tension', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('3d42cb46-5ae0-4129-ab26-d63e3a1dcea4', 'Practice self‑compassion', 'Develop habits and techniques for nurturing self-compassion', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('40579765-5d6a-4b55-90ab-62adb171f4d8', 'Increase mental clarity and decision‑making', 'Develop habits for making clearer, more confident decisions', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('40d4f1de-8b09-46ee-b0f4-9dadf7e63a1f', 'Maintain a sense of purpose and meaning', 'Develop habits for aligning daily life with deeper values', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('413ad659-2f29-4d47-af04-d76e6d682f49', 'Reduce avoidance or procrastination', 'Develop discipline and techniques for addressing avoidance', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('44c5fc46-152b-496b-a523-4f68e9a5404d', 'Build resilience and grit', 'Develop strength and resilience for challenging times', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('4cf2e10f-f29d-4c8b-8596-5b7253b0da89', 'Manage sadness or depression', 'Develop tools and habits for managing depressive thoughts', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('4f4910a9-83e1-4791-bf42-099ea609e515', 'Enhance mindfulness and present‑moment focus', 'Develop habits for focusing attention on the present', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('543bccaa-bc22-4e94-b65f-ee0f7ccdf6e0', 'Build emotional resilience', 'Develop the ability to recover quickly from emotional setbacks', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('55c460f0-5d67-43a9-9f9e-4566ca6a5a55', 'Challenge and reframe negative thoughts', 'Develop habits for identifying and reshaping thought patterns', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('5943ce50-8bbc-4c72-9460-8ee5c95310f1', 'Reduce self‑criticism', 'Develop strategies for cultivating a compassionate inner voice', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('5f4e0126-cc35-4f07-b221-0fe8451b95a3', 'Develop a sense of safety and stability', 'Develop habits for cultivating a safe and stable environment', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('6015ae1b-03e0-4114-a9a7-2a4155ecadc3', 'Clarify personal values and priorities', 'Develop a deeper understanding of core values', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('61a16e8d-ce53-48de-a7c8-729188dd62eb', 'Reduce catastrophic thinking', 'Develop techniques for managing and reframing catastrophic thoughts', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('66f6bf91-a538-4dd2-a937-a8a1d5424057', 'Develop a calmer state of mind', 'Practice mindfulness and relaxation to maintain a calmer state', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('67cf4f28-a53a-4c69-87f8-65b86422eab6', 'Build trust and intimacy', 'Develop deeper trust and intimacy in relationships', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('8ce5d9bf-e8cc-4f19-a04a-773df021b2dd', 'Increase gratitude and positivity', 'Develop habits for nurturing a grateful, optimistic outlook', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('95917e8e-5da6-489d-bdfc-7ccbdb734001', 'Cope with trauma or PTSD', 'Develop coping strategies for managing trauma and PTSD', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('96fbec9c-17f1-4b30-937e-60f031299be1', 'Reduce flashbacks or intrusive memories', 'Develop techniques for managing intrusive thoughts', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('9a770540-7cc1-4033-a64b-726e800ea572', 'Improve overall quality of life', 'Develop habits for nurturing long‑term well‑being', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('a01a2c6f-afe3-4df7-a518-0e9a15c8eb87', 'Enhance focus and motivation', 'Develop habits for increased focus and motivation', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('b336aba2-9775-4e41-86a3-0743b27fd3c1', 'Enhance assertiveness', 'Develop assertiveness and the ability to express needs clearly', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('b9f471d9-8389-4a0e-b4f4-c3ad9d248397', 'Develop better work‑life balance', 'Develop habits for aligning personal and professional priorities', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('be25659e-158a-46c2-9abd-396a67f001d3', 'Build a growth mindset', 'Develop resilience and a mindset oriented toward learning and improvement', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('c28681a5-325c-4d2b-a475-649dd9a879e5', 'Cope with grief and loss', 'Develop coping and support strategies for managing loss', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('c3a05853-6708-4640-b780-263509b93693', 'Build self‑confidence and self‑esteem', 'Develop habits and mindset for greater self-worth', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('d316f4a8-1ebe-499d-89ab-d5cc16cf87ca', 'Adjust to a new role (parent, caregiver, employee)', 'Develop coping strategies for role changes', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('dce3ff13-094a-40c7-b7a6-143060eb5703', 'Minimize overthinking or rumination', 'Develop mindfulness techniques to reduce overthinking', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('e009ce4d-6006-4170-937d-5204d4f85182', 'Identify and understand emotions', 'Develop emotional literacy and self-awareness', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('e2e98a6c-70dd-4d3e-8a67-a22d5d3c6fda', 'Build trust in relationships post‑trauma', 'Develop trust and emotional safety after trauma', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('e97b7a07-1a02-4177-b447-e05f6d7bb4bc', 'Minimize intrusive thoughts', 'Develop habits and techniques for reducing intrusive thoughts', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('eb686095-2295-4d90-b7c2-c189400c9808', 'Decrease feelings of anger', 'Learn techniques to recognize and reduce anger', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('ebd82bc4-f1ab-474a-8cd5-01114db48349', 'Cope with heartbreak or separation', 'Develop resilience and coping strategies for heartbreak', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('f0efaa81-676e-4e41-a691-1142130c07a8', 'Reduce overwhelm', 'Develop coping strategies for feelings of being overwhelmed', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00'), ('fb3612ab-15ce-4aa8-8af8-bb423aed3725', 'Adapt to career changes or job loss', 'Develop resilience and adaptability for career transitions', '2025-06-25 17:38:22.781922+00', '2025-06-25 17:38:22.781922+00');
-INSERT INTO "public"."goal_category_links" ("goal_id", "category_id") VALUES ('0984eebb-4200-4707-9cb4-a2863a8af1e1', '57919896-cf20-46b2-a804-092dc8a3892d'), ('0e209d19-0e43-4939-9be4-7c2c9f9f01bc', '57919896-cf20-46b2-a804-092dc8a3892d'), ('191c01d1-93d3-4ad3-8f3a-aeefe66abd10', 'e91c71c2-ce5f-43e8-bd25-574133e956f6'), ('1a192f43-0290-4f22-96d2-9fa8b794a91d', 'd4fce785-3c4e-4087-82e7-0c19589f8d44'), ('1a75f437-d027-4b1b-889b-14e52239128c', 'd4fce785-3c4e-4087-82e7-0c19589f8d44'), ('1be09ae8-813d-4180-b3a6-a9acb51e8c76', '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'), ('1d335213-d2c5-4dca-821b-a8dc8242ba2a', '57919896-cf20-46b2-a804-092dc8a3892d'), ('20b5eb65-c80b-472a-8765-4c0fa4a6241e', '57919896-cf20-46b2-a804-092dc8a3892d'), ('22817c89-2d34-4628-8b77-10358b9bd998', '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'), ('2d36ddbb-1c33-40b7-9b21-18cc15b7fab4', '454db690-41bf-4ba1-acbc-1224c56d6440'), ('2f4b4c35-33ee-49f2-8fe3-8ab241ff5afc', 'd4fce785-3c4e-4087-82e7-0c19589f8d44'), ('3253cde7-0b84-4833-b5e9-bc0e7a334cc2', '454db690-41bf-4ba1-acbc-1224c56d6440'), ('32632c5f-5892-4c23-bbf7-86d638cec10b', '57919896-cf20-46b2-a804-092dc8a3892d'), ('38fb5068-b5e7-4aa4-83ba-66f047c28c59', 'd4fce785-3c4e-4087-82e7-0c19589f8d44'), ('3d42cb46-5ae0-4129-ab26-d63e3a1dcea4', '7030b9af-9e1b-467b-ac8b-eedee7559065'), ('40579765-5d6a-4b55-90ab-62adb171f4d8', '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'), ('40d4f1de-8b09-46ee-b0f4-9dadf7e63a1f', 'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'), ('413ad659-2f29-4d47-af04-d76e6d682f49', '57919896-cf20-46b2-a804-092dc8a3892d'), ('44c5fc46-152b-496b-a523-4f68e9a5404d', 'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'), ('4cf2e10f-f29d-4c8b-8596-5b7253b0da89', 'e91c71c2-ce5f-43e8-bd25-574133e956f6'), ('4f4910a9-83e1-4791-bf42-099ea609e515', 'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'), ('543bccaa-bc22-4e94-b65f-ee0f7ccdf6e0', 'e91c71c2-ce5f-43e8-bd25-574133e956f6'), ('55c460f0-5d67-43a9-9f9e-4566ca6a5a55', '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'), ('5943ce50-8bbc-4c72-9460-8ee5c95310f1', '7030b9af-9e1b-467b-ac8b-eedee7559065'), ('5f4e0126-cc35-4f07-b221-0fe8451b95a3', '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'), ('6015ae1b-03e0-4114-a9a7-2a4155ecadc3', '7030b9af-9e1b-467b-ac8b-eedee7559065'), ('61a16e8d-ce53-48de-a7c8-729188dd62eb', '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'), ('66f6bf91-a538-4dd2-a937-a8a1d5424057', 'e91c71c2-ce5f-43e8-bd25-574133e956f6'), ('67cf4f28-a53a-4c69-87f8-65b86422eab6', 'd4fce785-3c4e-4087-82e7-0c19589f8d44'), ('8ce5d9bf-e8cc-4f19-a04a-773df021b2dd', 'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'), ('95917e8e-5da6-489d-bdfc-7ccbdb734001', '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'), ('96fbec9c-17f1-4b30-937e-60f031299be1', '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'), ('9a770540-7cc1-4033-a64b-726e800ea572', 'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'), ('a01a2c6f-afe3-4df7-a518-0e9a15c8eb87', '7030b9af-9e1b-467b-ac8b-eedee7559065'), ('b336aba2-9775-4e41-86a3-0743b27fd3c1', 'd4fce785-3c4e-4087-82e7-0c19589f8d44'), ('b9f471d9-8389-4a0e-b4f4-c3ad9d248397', 'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'), ('be25659e-158a-46c2-9abd-396a67f001d3', '7030b9af-9e1b-467b-ac8b-eedee7559065'), ('c28681a5-325c-4d2b-a475-649dd9a879e5', '454db690-41bf-4ba1-acbc-1224c56d6440'), ('c3a05853-6708-4640-b780-263509b93693', '7030b9af-9e1b-467b-ac8b-eedee7559065'), ('d316f4a8-1ebe-499d-89ab-d5cc16cf87ca', '454db690-41bf-4ba1-acbc-1224c56d6440'), ('dce3ff13-094a-40c7-b7a6-143060eb5703', '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'), ('e009ce4d-6006-4170-937d-5204d4f85182', '7030b9af-9e1b-467b-ac8b-eedee7559065'), ('e2e98a6c-70dd-4d3e-8a67-a22d5d3c6fda', '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'), ('e97b7a07-1a02-4177-b447-e05f6d7bb4bc', 'e91c71c2-ce5f-43e8-bd25-574133e956f6'), ('eb686095-2295-4d90-b7c2-c189400c9808', 'e91c71c2-ce5f-43e8-bd25-574133e956f6'), ('ebd82bc4-f1ab-474a-8cd5-01114db48349', 'd4fce785-3c4e-4087-82e7-0c19589f8d44'), ('f0efaa81-676e-4e41-a691-1142130c07a8', 'e91c71c2-ce5f-43e8-bd25-574133e956f6'), ('fb3612ab-15ce-4aa8-8af8-bb423aed3725', '454db690-41bf-4ba1-acbc-1224c56d6440');
+insert into
+  "public"."goal_categories" (
+    "id",
+    "name",
+    "description",
+    "created_at",
+    "updated_at"
+  )
+values
+  (
+    '2ce121d5-fece-4bfa-9157-3bc1ee3e7731',
+    'Cognitive Goals',
+    'Challenging thinking patterns and building mental clarity',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '3e9b34c3-6975-4e44-b3d3-865b925b5fbb',
+    'Trauma & Healing',
+    'Processing trauma and building safety',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '454db690-41bf-4ba1-acbc-1224c56d6440',
+    'Life Transition Goals',
+    'Adapting to new roles and life changes',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '57919896-cf20-46b2-a804-092dc8a3892d',
+    'Behavioral Goals',
+    'Developing better habits and routines',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '7030b9af-9e1b-467b-ac8b-eedee7559065',
+    'Self‑Awareness & Personal Growth',
+    'Understanding and developing oneself',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0',
+    'Mindset & Well‑being',
+    'Fostering resilience, balance, and quality of life',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'd4fce785-3c4e-4087-82e7-0c19589f8d44',
+    'Relationship & Social Goals',
+    'Improving connections with others',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'e91c71c2-ce5f-43e8-bd25-574133e956f6',
+    'Emotional Regulation',
+    'Managing feelings like anxiety, anger, and depression',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  );
+
+insert into
+  "public"."goals" (
+    "id",
+    "title",
+    "description",
+    "created_at",
+    "updated_at"
+  )
+values
+  (
+    '0984eebb-4200-4707-9cb4-a2863a8af1e1',
+    'Minimize addictive or harmful behavior',
+    'Develop coping strategies for addiction and harmful habits',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '0e209d19-0e43-4939-9be4-7c2c9f9f01bc',
+    'Develop relaxation and mindfulness practices',
+    'Develop relaxation techniques and mindfulness habits',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '191c01d1-93d3-4ad3-8f3a-aeefe66abd10',
+    'Reduce anxiety',
+    'Develop strategies to decrease feelings of anxiety',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '1a192f43-0290-4f22-96d2-9fa8b794a91d',
+    'Establish or maintain boundaries',
+    'Develop the ability to set and respect boundaries',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '1a75f437-d027-4b1b-889b-14e52239128c',
+    'Increase social connections',
+    'Develop habits and skills for nurturing connections',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '1be09ae8-813d-4180-b3a6-a9acb51e8c76',
+    'Integrate trauma narratives in a healthy way',
+    'Develop methods for processing and integrating trauma narratives',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '1d335213-d2c5-4dca-821b-a8dc8242ba2a',
+    'Enhance productivity and focus',
+    'Develop habits for increased efficiency and productivity',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '20b5eb65-c80b-472a-8765-4c0fa4a6241e',
+    'Build better habits (sleep, exercise, routine)',
+    'Develop consistent habits for overall well‑being',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '22817c89-2d34-4628-8b77-10358b9bd998',
+    'Develop problem‑solving strategies',
+    'Develop structured approaches to problem‑solving',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '2d36ddbb-1c33-40b7-9b21-18cc15b7fab4',
+    'Maintain balance during relocations or moves',
+    'Develop strategies for maintaining stability during moves',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '2f4b4c35-33ee-49f2-8fe3-8ab241ff5afc',
+    'Improve communication with partner/family',
+    'Develop effective communication skills for closer relationships',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '3253cde7-0b84-4833-b5e9-bc0e7a334cc2',
+    'Build resilience through divorce or separation',
+    'Develop habits and coping strategies for navigating separation',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '32632c5f-5892-4c23-bbf7-86d638cec10b',
+    'Maintain consistency and discipline',
+    'Develop structures and accountability for sustaining habits',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '38fb5068-b5e7-4aa4-83ba-66f047c28c59',
+    'Reduce conflict or tension',
+    'Develop tools to de-escalate conflict and reduce tension',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '3d42cb46-5ae0-4129-ab26-d63e3a1dcea4',
+    'Practice self‑compassion',
+    'Develop habits and techniques for nurturing self-compassion',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '40579765-5d6a-4b55-90ab-62adb171f4d8',
+    'Increase mental clarity and decision‑making',
+    'Develop habits for making clearer, more confident decisions',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '40d4f1de-8b09-46ee-b0f4-9dadf7e63a1f',
+    'Maintain a sense of purpose and meaning',
+    'Develop habits for aligning daily life with deeper values',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '413ad659-2f29-4d47-af04-d76e6d682f49',
+    'Reduce avoidance or procrastination',
+    'Develop discipline and techniques for addressing avoidance',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '44c5fc46-152b-496b-a523-4f68e9a5404d',
+    'Build resilience and grit',
+    'Develop strength and resilience for challenging times',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '4cf2e10f-f29d-4c8b-8596-5b7253b0da89',
+    'Manage sadness or depression',
+    'Develop tools and habits for managing depressive thoughts',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '4f4910a9-83e1-4791-bf42-099ea609e515',
+    'Enhance mindfulness and present‑moment focus',
+    'Develop habits for focusing attention on the present',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '543bccaa-bc22-4e94-b65f-ee0f7ccdf6e0',
+    'Build emotional resilience',
+    'Develop the ability to recover quickly from emotional setbacks',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '55c460f0-5d67-43a9-9f9e-4566ca6a5a55',
+    'Challenge and reframe negative thoughts',
+    'Develop habits for identifying and reshaping thought patterns',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '5943ce50-8bbc-4c72-9460-8ee5c95310f1',
+    'Reduce self‑criticism',
+    'Develop strategies for cultivating a compassionate inner voice',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '5f4e0126-cc35-4f07-b221-0fe8451b95a3',
+    'Develop a sense of safety and stability',
+    'Develop habits for cultivating a safe and stable environment',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '6015ae1b-03e0-4114-a9a7-2a4155ecadc3',
+    'Clarify personal values and priorities',
+    'Develop a deeper understanding of core values',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '61a16e8d-ce53-48de-a7c8-729188dd62eb',
+    'Reduce catastrophic thinking',
+    'Develop techniques for managing and reframing catastrophic thoughts',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '66f6bf91-a538-4dd2-a937-a8a1d5424057',
+    'Develop a calmer state of mind',
+    'Practice mindfulness and relaxation to maintain a calmer state',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '67cf4f28-a53a-4c69-87f8-65b86422eab6',
+    'Build trust and intimacy',
+    'Develop deeper trust and intimacy in relationships',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '8ce5d9bf-e8cc-4f19-a04a-773df021b2dd',
+    'Increase gratitude and positivity',
+    'Develop habits for nurturing a grateful, optimistic outlook',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '95917e8e-5da6-489d-bdfc-7ccbdb734001',
+    'Cope with trauma or PTSD',
+    'Develop coping strategies for managing trauma and PTSD',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '96fbec9c-17f1-4b30-937e-60f031299be1',
+    'Reduce flashbacks or intrusive memories',
+    'Develop techniques for managing intrusive thoughts',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    '9a770540-7cc1-4033-a64b-726e800ea572',
+    'Improve overall quality of life',
+    'Develop habits for nurturing long‑term well‑being',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'a01a2c6f-afe3-4df7-a518-0e9a15c8eb87',
+    'Enhance focus and motivation',
+    'Develop habits for increased focus and motivation',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'b336aba2-9775-4e41-86a3-0743b27fd3c1',
+    'Enhance assertiveness',
+    'Develop assertiveness and the ability to express needs clearly',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'b9f471d9-8389-4a0e-b4f4-c3ad9d248397',
+    'Develop better work‑life balance',
+    'Develop habits for aligning personal and professional priorities',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'be25659e-158a-46c2-9abd-396a67f001d3',
+    'Build a growth mindset',
+    'Develop resilience and a mindset oriented toward learning and improvement',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'c28681a5-325c-4d2b-a475-649dd9a879e5',
+    'Cope with grief and loss',
+    'Develop coping and support strategies for managing loss',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'c3a05853-6708-4640-b780-263509b93693',
+    'Build self‑confidence and self‑esteem',
+    'Develop habits and mindset for greater self-worth',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'd316f4a8-1ebe-499d-89ab-d5cc16cf87ca',
+    'Adjust to a new role (parent, caregiver, employee)',
+    'Develop coping strategies for role changes',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'dce3ff13-094a-40c7-b7a6-143060eb5703',
+    'Minimize overthinking or rumination',
+    'Develop mindfulness techniques to reduce overthinking',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'e009ce4d-6006-4170-937d-5204d4f85182',
+    'Identify and understand emotions',
+    'Develop emotional literacy and self-awareness',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'e2e98a6c-70dd-4d3e-8a67-a22d5d3c6fda',
+    'Build trust in relationships post‑trauma',
+    'Develop trust and emotional safety after trauma',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'e97b7a07-1a02-4177-b447-e05f6d7bb4bc',
+    'Minimize intrusive thoughts',
+    'Develop habits and techniques for reducing intrusive thoughts',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'eb686095-2295-4d90-b7c2-c189400c9808',
+    'Decrease feelings of anger',
+    'Learn techniques to recognize and reduce anger',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'ebd82bc4-f1ab-474a-8cd5-01114db48349',
+    'Cope with heartbreak or separation',
+    'Develop resilience and coping strategies for heartbreak',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'f0efaa81-676e-4e41-a691-1142130c07a8',
+    'Reduce overwhelm',
+    'Develop coping strategies for feelings of being overwhelmed',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  ),
+  (
+    'fb3612ab-15ce-4aa8-8af8-bb423aed3725',
+    'Adapt to career changes or job loss',
+    'Develop resilience and adaptability for career transitions',
+    '2025-06-25 17:38:22.781922+00',
+    '2025-06-25 17:38:22.781922+00'
+  );
+
+insert into
+  "public"."goal_category_links" ("goal_id", "category_id")
+values
+  (
+    '0984eebb-4200-4707-9cb4-a2863a8af1e1',
+    '57919896-cf20-46b2-a804-092dc8a3892d'
+  ),
+  (
+    '0e209d19-0e43-4939-9be4-7c2c9f9f01bc',
+    '57919896-cf20-46b2-a804-092dc8a3892d'
+  ),
+  (
+    '191c01d1-93d3-4ad3-8f3a-aeefe66abd10',
+    'e91c71c2-ce5f-43e8-bd25-574133e956f6'
+  ),
+  (
+    '1a192f43-0290-4f22-96d2-9fa8b794a91d',
+    'd4fce785-3c4e-4087-82e7-0c19589f8d44'
+  ),
+  (
+    '1a75f437-d027-4b1b-889b-14e52239128c',
+    'd4fce785-3c4e-4087-82e7-0c19589f8d44'
+  ),
+  (
+    '1be09ae8-813d-4180-b3a6-a9acb51e8c76',
+    '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'
+  ),
+  (
+    '1d335213-d2c5-4dca-821b-a8dc8242ba2a',
+    '57919896-cf20-46b2-a804-092dc8a3892d'
+  ),
+  (
+    '20b5eb65-c80b-472a-8765-4c0fa4a6241e',
+    '57919896-cf20-46b2-a804-092dc8a3892d'
+  ),
+  (
+    '22817c89-2d34-4628-8b77-10358b9bd998',
+    '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'
+  ),
+  (
+    '2d36ddbb-1c33-40b7-9b21-18cc15b7fab4',
+    '454db690-41bf-4ba1-acbc-1224c56d6440'
+  ),
+  (
+    '2f4b4c35-33ee-49f2-8fe3-8ab241ff5afc',
+    'd4fce785-3c4e-4087-82e7-0c19589f8d44'
+  ),
+  (
+    '3253cde7-0b84-4833-b5e9-bc0e7a334cc2',
+    '454db690-41bf-4ba1-acbc-1224c56d6440'
+  ),
+  (
+    '32632c5f-5892-4c23-bbf7-86d638cec10b',
+    '57919896-cf20-46b2-a804-092dc8a3892d'
+  ),
+  (
+    '38fb5068-b5e7-4aa4-83ba-66f047c28c59',
+    'd4fce785-3c4e-4087-82e7-0c19589f8d44'
+  ),
+  (
+    '3d42cb46-5ae0-4129-ab26-d63e3a1dcea4',
+    '7030b9af-9e1b-467b-ac8b-eedee7559065'
+  ),
+  (
+    '40579765-5d6a-4b55-90ab-62adb171f4d8',
+    '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'
+  ),
+  (
+    '40d4f1de-8b09-46ee-b0f4-9dadf7e63a1f',
+    'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'
+  ),
+  (
+    '413ad659-2f29-4d47-af04-d76e6d682f49',
+    '57919896-cf20-46b2-a804-092dc8a3892d'
+  ),
+  (
+    '44c5fc46-152b-496b-a523-4f68e9a5404d',
+    'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'
+  ),
+  (
+    '4cf2e10f-f29d-4c8b-8596-5b7253b0da89',
+    'e91c71c2-ce5f-43e8-bd25-574133e956f6'
+  ),
+  (
+    '4f4910a9-83e1-4791-bf42-099ea609e515',
+    'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'
+  ),
+  (
+    '543bccaa-bc22-4e94-b65f-ee0f7ccdf6e0',
+    'e91c71c2-ce5f-43e8-bd25-574133e956f6'
+  ),
+  (
+    '55c460f0-5d67-43a9-9f9e-4566ca6a5a55',
+    '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'
+  ),
+  (
+    '5943ce50-8bbc-4c72-9460-8ee5c95310f1',
+    '7030b9af-9e1b-467b-ac8b-eedee7559065'
+  ),
+  (
+    '5f4e0126-cc35-4f07-b221-0fe8451b95a3',
+    '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'
+  ),
+  (
+    '6015ae1b-03e0-4114-a9a7-2a4155ecadc3',
+    '7030b9af-9e1b-467b-ac8b-eedee7559065'
+  ),
+  (
+    '61a16e8d-ce53-48de-a7c8-729188dd62eb',
+    '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'
+  ),
+  (
+    '66f6bf91-a538-4dd2-a937-a8a1d5424057',
+    'e91c71c2-ce5f-43e8-bd25-574133e956f6'
+  ),
+  (
+    '67cf4f28-a53a-4c69-87f8-65b86422eab6',
+    'd4fce785-3c4e-4087-82e7-0c19589f8d44'
+  ),
+  (
+    '8ce5d9bf-e8cc-4f19-a04a-773df021b2dd',
+    'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'
+  ),
+  (
+    '95917e8e-5da6-489d-bdfc-7ccbdb734001',
+    '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'
+  ),
+  (
+    '96fbec9c-17f1-4b30-937e-60f031299be1',
+    '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'
+  ),
+  (
+    '9a770540-7cc1-4033-a64b-726e800ea572',
+    'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'
+  ),
+  (
+    'a01a2c6f-afe3-4df7-a518-0e9a15c8eb87',
+    '7030b9af-9e1b-467b-ac8b-eedee7559065'
+  ),
+  (
+    'b336aba2-9775-4e41-86a3-0743b27fd3c1',
+    'd4fce785-3c4e-4087-82e7-0c19589f8d44'
+  ),
+  (
+    'b9f471d9-8389-4a0e-b4f4-c3ad9d248397',
+    'cf9a8e78-3724-4b90-8f1d-9574fc6c17a0'
+  ),
+  (
+    'be25659e-158a-46c2-9abd-396a67f001d3',
+    '7030b9af-9e1b-467b-ac8b-eedee7559065'
+  ),
+  (
+    'c28681a5-325c-4d2b-a475-649dd9a879e5',
+    '454db690-41bf-4ba1-acbc-1224c56d6440'
+  ),
+  (
+    'c3a05853-6708-4640-b780-263509b93693',
+    '7030b9af-9e1b-467b-ac8b-eedee7559065'
+  ),
+  (
+    'd316f4a8-1ebe-499d-89ab-d5cc16cf87ca',
+    '454db690-41bf-4ba1-acbc-1224c56d6440'
+  ),
+  (
+    'dce3ff13-094a-40c7-b7a6-143060eb5703',
+    '2ce121d5-fece-4bfa-9157-3bc1ee3e7731'
+  ),
+  (
+    'e009ce4d-6006-4170-937d-5204d4f85182',
+    '7030b9af-9e1b-467b-ac8b-eedee7559065'
+  ),
+  (
+    'e2e98a6c-70dd-4d3e-8a67-a22d5d3c6fda',
+    '3e9b34c3-6975-4e44-b3d3-865b925b5fbb'
+  ),
+  (
+    'e97b7a07-1a02-4177-b447-e05f6d7bb4bc',
+    'e91c71c2-ce5f-43e8-bd25-574133e956f6'
+  ),
+  (
+    'eb686095-2295-4d90-b7c2-c189400c9808',
+    'e91c71c2-ce5f-43e8-bd25-574133e956f6'
+  ),
+  (
+    'ebd82bc4-f1ab-474a-8cd5-01114db48349',
+    'd4fce785-3c4e-4087-82e7-0c19589f8d44'
+  ),
+  (
+    'f0efaa81-676e-4e41-a691-1142130c07a8',
+    'e91c71c2-ce5f-43e8-bd25-574133e956f6'
+  ),
+  (
+    'fb3612ab-15ce-4aa8-8af8-bb423aed3725',
+    '454db690-41bf-4ba1-acbc-1224c56d6440'
+  );
 --
 -- PostgreSQL database dump complete
 --
