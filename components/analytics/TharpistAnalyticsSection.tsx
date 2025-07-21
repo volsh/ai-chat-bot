@@ -18,11 +18,8 @@ import ToneDistributionPie from "./ToneDistributionPie";
 import EmotionDistributionPie from "./EmotionDistributionPie";
 import IntensitiesDistributionsBar from "./IntensitiesDistributionsBar";
 import IntensitiesDistributionsArea from "./IntensitiesDistributionsArea";
-import AvgScoreBar from "./AvgScoreBar";
 import IntensityOverTimeLine from "./IntensityOverTimeLine";
 import Spinner from "../ui/spinner";
-import { SessionReviewMetricsChart } from "./SessionReviewMetricsChart";
-import { GoalAlignmentTrendChart } from "./GoalAlignmentChart";
 import { SessionScoreTrendChart } from "./SessionScoreTrendChart";
 import { useAppStore } from "@/state";
 
@@ -163,44 +160,6 @@ export default function TharpistAnalyticsSection() {
           onChange={(value) => setFilter("alignment_score", value)}
           useDebounce
         />
-        {/* <Slider
-          label="Score Cutoff Threshold"
-          min={1}
-          max={5}
-          step={1}
-          value={filters.scoreCutoff || 3}
-          onChange={(value) => setFilter("scoreCutoff", value)}
-          useDebounce
-          tooltip={
-            <>
-              Only include entries with a score equal to or above this value.
-              <ul className="mt-1 list-disc pl-5">
-                <li>
-                  <strong>5</strong> – Manually corrected, or alignment with goal ≥ <code>0.9</code>{" "}
-                  and intensity ≥ <code>0.8</code>
-                </li>
-                <li>
-                  <strong>4</strong> – Alignment with goal ≥ <code>0.9</code> and intensity ≥{" "}
-                  <code>0.4</code>, or alignment with goal ≥ <code>0.7</code> and intensity ≥{" "}
-                  <code>0.8</code>
-                </li>
-                <li>
-                  <strong>3</strong> – Alignment with goal ≥ <code>0.6</code> and intensity ≥{" "}
-                  <code>0.6</code>
-                </li>
-                <li>
-                  <strong>2</strong> – Alignment with goal ≥ <code>0.4</code> and intensity ≥{" "}
-                  <code>0.4</code>, or alignment with goal ≥ <code>0.2</code> or intensity ≥{" "}
-                  <code>0.2</code>
-                </li>
-                <li>
-                  <strong>1</strong> – Everything else (very weak signals)
-                </li>
-              </ul>
-            </>
-          }
-          tooltipId="scoreCutoffTooltip"
-        /> */}
         <Slider
           label="Minimum Emotion Frequency"
           min={0}
@@ -280,12 +239,8 @@ export default function TharpistAnalyticsSection() {
         <div className="mt-8">
           <SessionScoreTrendChart rows={filteredRows} />
         </div>
-        {/* <div className="mt-8">
-          <GoalAlignmentTrendChart rows={filteredRows} />
-        </div> */}
         <div className="mt-8">
           <AnnotationsConsistencyChart rows={filteredRows} />
-          {/* <SessionReviewMetricsChart rows={filteredRows} /> */}
         </div>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <CorrectedMessagesBox rows={filteredRows} />

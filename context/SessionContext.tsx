@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabaseBrowserClient } from "@/libs/supabase";
 import { useAppStore } from "@/state";
@@ -16,38 +16,39 @@ export const SessionProvider = ({
   const { session, setSession, setLoadingProfile } = useAppStore();
 
   useEffect(() => {
-    // Try to load session immediately (may be null)
-    if (!session) {
-      supabaseBrowserClient.auth.getSession().then(({ data }) => {
-        if (data?.session) {
-          setSession(data.session);
-        }
-      });
-    }
+    let mounted = true;
 
-    // Ensure we respond to login/logout events
+    // Always check current session on mount (cookie-based or memory)
+    supabaseBrowserClient.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) {
+        console.warn("Failed to get session", error);
+        return;
+      }
+      if (data.session) {
+        setSession(data.session);
+      } else {
+        setSession(null); // explicitly clear
+      }
+    });
+
+    // Subscribe to login/logout/token refresh events
     const { data: listener } = supabaseBrowserClient.auth.onAuthStateChange(
-      (_event, localSession) => {
+      (_event, newSession) => {
         if (_event === "SIGNED_OUT") {
+          setSession(null);
           setLoadingProfile(false);
-          return;
-        }
-        if (session) return;
-        if (localSession) {
-          setSession(localSession);
-          return;
-        }
-        if (_event === "SIGNED_IN" && !localSession) {
-          setLoadingProfile(false); // can't load profile, set the loading state to false so main navgiator will redirect to login page
-          return;
+        } else if (_event === "SIGNED_IN" || _event === "TOKEN_REFRESHED") {
+          setSession(newSession ?? null);
         }
       }
     );
 
     return () => {
+      mounted = false;
       listener?.subscription?.unsubscribe?.();
     };
-  }, []);
+  }, [setSession, setLoadingProfile]);
 
   return (
     <SessionContext.Provider value={session}>

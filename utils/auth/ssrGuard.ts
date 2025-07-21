@@ -19,7 +19,7 @@ export default async function withRoleGuard(
   const user = userData.user;
 
   const { data } = await supabase.from("users").select("role").eq("id", user?.id).single();
-  
+
   if (!!allowedRoles && !allowedRoles.includes(data?.role)) {
     return {
       redirect: {

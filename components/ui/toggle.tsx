@@ -3,7 +3,7 @@ import React, { ReactNode } from "react";
 import { Tooltip } from "react-tooltip";
 
 interface ToggleProps {
-  label: string | React.ReactNode;
+  label?: string | React.ReactNode;
   checked: boolean;
   onChange: (checked: boolean) => void;
   tooltip?: string | ReactNode;

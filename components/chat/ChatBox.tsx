@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Emotion, Message, MessageWithEmotion, Session, SessionWithGoal } from "@/types";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Emotion,
+  EmotionLog,
+  Message,
+  MessageWithEmotion,
+  Session,
+  SessionWithGoal,
+} from "@/types";
 import { loadSessionMessages, updateSessionTitle } from "@/utils/supabase";
 import { sendChatMessage } from "@/utils/api";
 import clsx from "clsx";
@@ -17,10 +24,12 @@ import { useAppStore } from "@/state";
 import { AnimatePresence } from "framer-motion";
 import { useShallow } from "zustand/react/shallow";
 import ChatMessage from "./ChatMessage";
-import saveMessageToDB from "@/utils/chat/saveMessageToDB";
+import saveMessageToDB, { convertMessageToMessageWithEmotion } from "@/utils/chat/saveMessageToDB";
 import startNewChat from "@/utils/chat/startNewChat";
 import Modal from "../ui/modal";
 import Spinner from "../ui/spinner";
+import PresenceBadge from "../ui/PresenceBadge";
+import { useRealtimeSessionData } from "@/hooks/useRealtimeSessionData";
 
 interface ChatBoxProps {
   initialSession?: Session;
@@ -37,7 +46,6 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   const [session, setSession] = useState<SessionWithGoal>();
   const [summary, setSummary] = useState<string>(initialSession?.summary!);
   const [showEditor, setShowEditor] = useState(false);
-  const [emotionLogs, setEmotionLogs] = useState<Record<string, MessageWithEmotion>>({});
   const [tagAssistantEnabled, setTagAssistantEnabled] = useState(true);
   const [showSummary, setShowSummary] = useState(true);
   const [expandedSummary, setExpandedSummary] = useState(false);
@@ -50,7 +58,32 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   const { userProfile } = useAppStore(useShallow((s) => ({ userProfile: s.userProfile })));
   const userId = userProfile?.id;
   const sessionId = initialSession?.id;
-  const { othersTyping, setTyping } = usePresenceChannel(sessionId, userId);
+
+  const { othersPresent, othersTyping, setTyping } = usePresenceChannel(sessionId);
+
+  const newUserMessage = useRef(false);
+
+  const handleNewLog = useCallback(
+    (log: EmotionLog) => {
+      if (newUserMessage.current) {
+        newUserMessage.current = false;
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === log.source_id ? { ...msg, ...log } : msg))
+        );
+      }
+    },
+    [messages]
+  );
+
+  const { isReady, waitUntilReady } = useRealtimeSessionData(sessionId!, {
+    onNewMessage: (m) => {
+      setMessages((prev) => [...prev, convertMessageToMessageWithEmotion(m)]);
+      newUserMessage.current = true;
+    },
+    onUpdateMessage: (m) => setMessages((prev) => prev.map((msg) => (msg.id === m.id ? m : msg))),
+    onNewLog: handleNewLog,
+  });
+
   const countMessagesForSummary = useRef(0);
 
   const isTherapist = userProfile?.role === "therapist";
@@ -112,6 +145,7 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
         content: json.message,
         created_at: new Date().toISOString(),
       } as MessageWithEmotion;
+      await waitUntilReady();
       const savedMessage = await saveMessageToDB(sessionData.id, firstMessage);
       setMessages([savedMessage]);
     } catch (err) {
@@ -126,20 +160,6 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
       setLoading(true);
       loadSessionMessages(sessionId).then((msgs: MessageWithEmotion[]) => {
         setMessages((prev) => (msgs ? [...prev, ...msgs] : prev));
-        const map = Object.fromEntries(
-          msgs
-            .filter((msg) => !!msg.emotion)
-            .map((msg) => [
-              msg.source_id,
-              {
-                emotion: msg.emotion,
-                intensity: msg.intensity,
-                tone: msg.tone,
-                topic: msg.topic,
-              },
-            ])
-        );
-        setEmotionLogs(map as Record<string, MessageWithEmotion>);
         setLoading(false);
       });
     }
@@ -231,16 +251,15 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
   const generateMessageAndTagEmotion = async (messages: MessageWithEmotion[]) => {
     try {
       const response = await sendChatMessage(session?.treatments.goals.title!, messages);
+      await waitUntilReady();
       const assistantMessage = await saveMessageToDB(sessionId!, response.message);
       setMessages([...messages, assistantMessage]);
       if (tagAssistantEnabled) {
         try {
-          const result = await tagEmotion(assistantMessage.id!, (optimistic) => {
-            setEmotionLogs((prev) => ({ ...prev, [assistantMessage.id!]: optimistic }));
-          });
-          if (result?.emotion) {
-            setEmotionLogs((prev) => ({ ...prev, [assistantMessage.id!]: result }));
-          }
+          const result = await tagEmotion(assistantMessage.id!);
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === result.source_id ? { ...msg, ...result } : msg))
+          );
         } catch {
           toast.error("Failed to tag emotion");
         }
@@ -293,20 +312,20 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
 
     let userMessageWithId: MessageWithEmotion;
     try {
+      await waitUntilReady();
       userMessageWithId = await saveMessageToDB(sessionId!, rawMessage);
       setMessages((prev) => [...prev, userMessageWithId]);
-      const result = await tagEmotion(userMessageWithId.id!, (optimistic) => {
-        setEmotionLogs((prev) => ({ ...prev, [userMessageWithId.id!]: optimistic }));
-      });
-      if (result?.emotion) {
-        setEmotionLogs((prev) => ({ ...prev, [userMessageWithId.id!]: result }));
+      const result = await tagEmotion(userMessageWithId.id!);
+      if (isTherapist) {
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === result.source_id ? { ...msg, ...result } : msg))
+        );
       }
     } catch {
       toast.error("Failed to save user message");
       setLoading(false);
       return;
     }
-
     await generateMessageAndTagEmotion([...messages, userMessageWithId]);
 
     try {
@@ -455,9 +474,8 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
         <AnimatePresence>
           {messages.map((msg, i) => (
             <ChatMessage
-              key={(msg as MessageWithEmotion).source_id || i}
+              key={(msg as MessageWithEmotion).id || i}
               msg={msg as MessageWithEmotion}
-              emotion={emotionLogs[(msg as MessageWithEmotion).source_id!]}
               regenerate={() => regenerate(i)}
               onRefresh={fetchMessages}
               loading={loading}
@@ -566,20 +584,24 @@ export default function ChatBox({ initialSession, onRefresh }: ChatBoxProps) {
         )}
       </div>
 
-      {othersTyping.length > 0 && (
-        <div className="mt-2 flex flex-col gap-1 text-xs text-gray-500">
-          {othersTyping.map((user) => (
-            <div key={user.id} className="flex items-center gap-2">
-              {user.avatar && (
-                <img src={user.avatar} className="h-4 w-4 rounded-full" alt="avatar" />
-              )}
-              <span>
-                <strong>{user.name}</strong> – {user.activity}
-              </span>
-            </div>
-          ))}
+      {othersPresent.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1 text-xs text-gray-500">
+          <div className="font-semibold text-zinc-600 dark:text-zinc-300">Online now:</div>
+          {othersPresent.map((user) => {
+            const isTyping = othersTyping.some((u) => u.id === user.id);
+            return (
+              <PresenceBadge
+                key={user.id}
+                name={user.name ?? "Anonymous"}
+                activity={isTyping ? "Typing…" : "Online"}
+                avatar={user.avatar}
+                status="online"
+              />
+            );
+          })}
         </div>
       )}
+
       {isFinishModalOpen && (
         <Modal onClose={() => setIsFinishModalOpen(false)}>
           <>

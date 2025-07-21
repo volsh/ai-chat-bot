@@ -1,7 +1,6 @@
 // libs/supabase.ts
 
-import { createBrowserClient, createServerClient } from "@supabase/ssr";
-import { serialize } from "cookie";
+import { createPagesServerClient, createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
 import type { NextApiRequest, NextApiResponse } from "next";
 
 const supabaseUrl = `https://${process.env.NEXT_PUBLIC_PROJECT_REF}.supabase.co`;
@@ -12,36 +11,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables.");
 }
 
-export const createSupabaseBrowserClient = () => createBrowserClient(supabaseUrl, supabaseAnonKey);
+export const createSupabaseBrowserClient = () =>
+  createPagesBrowserClient({
+    supabaseUrl,
+    supabaseKey: supabaseAnonKey,
+  });
 
 export const createSupabaseServerClient = (req: NextApiRequest, res: NextApiResponse) =>
-  createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      get: (name: string) => req.cookies[name],
-      set: (name: string, value: string, options: any) => {
-        const serialized = serialize(name, value, options);
-        res.setHeader("Set-Cookie", serialized);
-      },
-      remove: (name: string, options: any) => {
-        const serialized = serialize(name, "", { ...options, maxAge: 0 });
-        res.setHeader("Set-Cookie", serialized);
-      },
+  createPagesServerClient(
+    {
+      req,
+      res,
     },
-  });
-
-export const createSupabaseServerClientRoleKey = (req: NextApiRequest, res: NextApiResponse) =>
-  createServerClient(supabaseUrl, supabaseRoleKey, {
-    cookies: {
-      get: (name: string) => req.cookies[name],
-      set: (name: string, value: string, options: any) => {
-        const serialized = serialize(name, value, options);
-        res.setHeader("Set-Cookie", serialized);
-      },
-      remove: (name: string, options: any) => {
-        const serialized = serialize(name, "", { ...options, maxAge: 0 });
-        res.setHeader("Set-Cookie", serialized);
-      },
-    },
-  });
+    { supabaseUrl, supabaseKey: supabaseAnonKey }
+  );
 
 export const supabaseBrowserClient = createSupabaseBrowserClient();

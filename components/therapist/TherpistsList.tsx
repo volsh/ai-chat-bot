@@ -16,7 +16,7 @@ interface Props {
   loadingTherapists?: boolean;
 }
 
-const TherapistList = ({
+const TherapistsList = ({
   sharedWith,
   setSharedWith,
   label,
@@ -91,4 +91,4 @@ const TherapistList = ({
   );
 };
 
-export default TherapistList;
+export default TherapistsList;

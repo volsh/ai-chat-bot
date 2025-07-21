@@ -4,7 +4,7 @@ import { differenceInDays } from "https://esm.sh/date-fns@3.6.0";
 serve(async (req) => {
   const { to_email, from_name, session_title, link, inviter_id, team_id } = await req.json();
   const supabase = createClient(
-    Deno.env.get("SUPABASE_URL"),
+    Deno.env.get("SUPABASE_URL") ?? `https://${Deno.env.get("PROJECT_REF")}.supabase.co`,
     Deno.env.get("SERVICE_ROLE_KEY")
   );
   // Rate limit: 10 per hour

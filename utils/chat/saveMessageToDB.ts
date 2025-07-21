@@ -1,6 +1,14 @@
 import { supabaseBrowserClient } from "@/libs/supabase";
 import { Message, MessageWithEmotion } from "@/types";
 
+export const convertMessageToMessageWithEmotion = (message: Message): MessageWithEmotion => ({
+  ...message,
+  message_created_at: message.created_at,
+  source_id: message.id,
+  source_type: "session",
+  message_role: message.role,
+});
+
 export default async function saveMessageToDB(
   sessionId: string,
   msg: Partial<Message>
@@ -15,11 +23,5 @@ export default async function saveMessageToDB(
     throw new Error(error.message || "Failed to save message");
   }
 
-  return {
-    ...data,
-    message_created_at: data.created_at,
-    source_id: data.id,
-    source_type: "session",
-    message_role: data.role,
-  };
+  return convertMessageToMessageWithEmotion(data);
 }

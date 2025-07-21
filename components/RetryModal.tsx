@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import Modal from "@/components/ui/modal";
 import Textarea from "@/components/ui/textarea";
 import Button from "@/components/ui/button";
-import StatusBadge from "@/components/StatusBadge";
+import StatusBadge from "@/components/fineTuning/FineTuningStatusBadge";
 import { FineTuneEvent } from "@/types";
 
 interface RetryModalProps {

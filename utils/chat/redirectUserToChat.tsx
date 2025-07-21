@@ -40,7 +40,7 @@ export const redirectUserToChat = async (context: GetServerSidePropsContext) => 
         .from("sessions")
         .insert([{ treatment_id: treatmentIds[0] }])
         .select()
-        .single();
+        .maybeSingle();
 
       sessionId = newSession?.id;
     } else {

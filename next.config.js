@@ -3,10 +3,6 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   productionBrowserSourceMaps: true,
-  webpack(config, { dev }) {
-    config.devtool = "source-map";
-    return config;
-  },
 };
 
 module.exports = nextConfig;

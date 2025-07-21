@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       model: "gpt-4-1106-preview",
       messages: [
         { role: "system", content: "Summarize the conversation in one short sentence." },
-        ...messages,
+        ...messages.map((m) => ({ role: m.role || m.message_role, content: m.content })),
       ],
       temperature: 0.3,
     });

@@ -9,7 +9,7 @@ import { format } from "date-fns";
 import { PostgrestError } from "@supabase/supabase-js";
 import { useAppStore } from "@/state";
 import { useShallow } from "zustand/react/shallow";
-import TherapistList from "../therapist/TherpistsList";
+import TherapistsList from "../therapist/TherpistsList";
 import Spinner from "../ui/spinner";
 import Select from "../ui/select";
 import Button from "../ui/button";
@@ -64,7 +64,7 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
         setTitle(data?.title ?? "");
         setEmoji(data?.emoji ?? "🌱");
         setColor(data?.color ?? "#3b82f6");
-        setSelectedGoalId(data?.goal_id ?? "Therapy");
+        setSelectedGoalId(data?.goal_id);
         setSummary(data?.summary ?? "");
         setTeamId(data?.team_id ?? "");
         setSharedWith(data?.shared_with ?? []);
@@ -118,7 +118,6 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
       const { data, error } = await supabase.from("goals").select("id, title");
       if (!error) {
         setGoals(data || []);
-        setSelectedGoalId(data[0].id);
       }
     };
     loadGoals();
@@ -383,7 +382,7 @@ export default function TreatmentEditorModal({ treatmentId, onClose, onRefresh }
         )}
 
         <div>
-          <TherapistList
+          <TherapistsList
             sharedWith={sharedWith}
             setSharedWith={setSharedWith}
             label="Share with Individual Therapists"

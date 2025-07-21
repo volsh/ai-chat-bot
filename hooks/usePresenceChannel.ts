@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabaseBrowserClient as supabase } from "@/libs/supabase";
 import { useAppStore } from "@/state";
 import { useShallow } from "zustand/react/shallow";
+import { debounce } from "lodash";
 
 export type PresenceMetaData = {
   id?: string;
@@ -11,14 +12,20 @@ export type PresenceMetaData = {
   activity?: string;
 };
 
-export function usePresenceChannel(sessionId?: string, userId?: string) {
+export function usePresenceChannel(sessionId?: string, metaOverride?: Partial<PresenceMetaData>) {
   const [othersTyping, setOthersTyping] = useState<PresenceMetaData[]>([]);
+  const [othersPresent, setOthersPresent] = useState<PresenceMetaData[]>([]);
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const currentMetadata = useRef<PresenceMetaData | null>(null);
+
   const { session } = useAppStore(
     useShallow((s) => ({
       session: s.session,
     }))
   );
+
+  const userId = session?.user.id;
+
   useEffect(() => {
     if (!sessionId || !userId) return;
 
@@ -27,45 +34,80 @@ export function usePresenceChannel(sessionId?: string, userId?: string) {
     });
     presenceChannelRef.current = channel;
 
+    const subscribeAndTrack = async () => {
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("full_name, avatar_url")
+        .eq("id", userId)
+        .single();
+
+      const fullPresence: PresenceMetaData = {
+        name: userProfile?.full_name ?? "Anonymous",
+        avatar: userProfile?.avatar_url ?? "",
+        activity: "Idle",
+        typing: false,
+        ...metaOverride,
+      };
+
+      currentMetadata.current = fullPresence;
+
+      await channel.track(fullPresence);
+    };
+
     channel.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
-        await channel.track({
-          typing: false,
-          name: session?.user.user_metadata.full_name ?? "Anonymous",
-          avatar: session?.user.user_metadata.avatar_url ?? "",
-          activity: "Idle",
-        });
+        try {
+          await subscribeAndTrack();
+        } catch (err) {
+          console.warn("Presence track failed:", err);
+        }
       }
     });
 
-    const updateTypingState = () => {
+    const updatePresenceState = debounce(() => {
       const state = channel.presenceState() as Record<string, PresenceMetaData[]>;
 
-      const others = Object.entries(state || {})
-        .filter(([id, users]) => id !== userId && users.some((u) => u.typing))
-        .map(([id, users]) => ({
-          id,
-          name: users[0].name ?? "Anonymous",
-          activity: users[0].activity ?? "Active",
-          avatar: users[0].avatar ?? "",
-        })) as PresenceMetaData[];
+      const others = Object.entries(state || {}).filter(([id]) => id !== userId);
 
-      setOthersTyping(others); // now an array of rich user objects
-    };
+      const present = others.map(([id, users]) => ({
+        id,
+        name: users[0].name ?? "Anonymous",
+        activity: users[0].activity ?? "Active",
+        avatar: users[0].avatar ?? "",
+      }));
 
-    channel.on("presence", { event: "sync" }, updateTypingState);
+      const typing = present.filter((u) => u.activity === "Typing…");
+
+      setOthersPresent(present);
+      setOthersTyping(typing);
+    }, 100);
+
+    channel.on("presence", { event: "sync" }, updatePresenceState);
 
     return () => {
       supabase.removeChannel(channel);
       presenceChannelRef.current = null;
     };
-  }, [sessionId, userId, session]);
+  }, [sessionId, userId, metaOverride]);
 
   const setTyping = (typing: boolean) => {
-    if (presenceChannelRef.current) {
-      presenceChannelRef.current.track({ typing, activity: typing ? "Typing…" : "Idle" });
-    }
+    if (!currentMetadata.current) return;
+
+    const updated = {
+      ...currentMetadata.current,
+      typing,
+      activity: typing ? "Typing…" : "Idle",
+    };
+
+    currentMetadata.current = updated;
+    presenceChannelRef.current?.track(updated);
   };
 
-  return { othersTyping, setTyping };
+  return {
+    othersTyping,
+    othersPresent,
+    isAnyoneTyping: othersTyping.length > 0,
+    isAnyoneOnline: othersPresent.length > 0,
+    setTyping,
+  };
 }

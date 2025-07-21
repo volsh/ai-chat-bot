@@ -128,104 +128,93 @@ $$;
 --
 -- Name: handle_new_user(); Type: FUNCTION; Schema: public; Owner: -
 --
-create function public.handle_new_user () RETURNS trigger LANGUAGE plpgsql as $$declare
-
-  inserted boolean := false;
-
-begin
-
-  insert into public.debug_trigger_log (context)
-
-  values ('handle_new_user START: ' || new.id || ' / ' || new.email);
-
-
-
-  begin
-
-    insert into public.users (id, email)
-
-    values (new.id, new.email);
-
-    inserted := true;
-
-  exception when others then
-
-    insert into public.debug_trigger_log (context)
-
-    values ('handle_new_user ERROR: ' || SQLERRM);
-
-  end;
-
-
-
-  if inserted then
-
-    insert into public.debug_trigger_log (context)
-
-    values ('handle_new_user SUCCESS: ' || new.id);
-
-  end if;
-
-
-
-  return new;
-
-end;$$;
-
---
--- Name: handle_session_end(); Type: FUNCTION; Schema: public; Owner: -
---
-create or replace function public.handle_session_end ()
+create function public.handle_new_user()
 returns trigger
 language plpgsql
 as $$
 declare
-  project_ref text;
-  service_role text;
-  frontend_url text;
-  fn_url text;
+  inserted boolean := false;
+  extracted_role text := null;
 begin
-  -- Only act when the session is ending
-  if NEW.ended_at is not null and OLD.ended_at is null then
-    -- Load secrets from Vault
-    select decrypted_secret into project_ref
-    from vault.decrypted_secrets
-    where name = 'project_ref';
+  insert into public.debug_trigger_log (context)
+  values ('handle_new_user START: ' || new.id || ' / ' || new.email);
 
-    select decrypted_secret into service_role
-    from vault.decrypted_secrets
-    where name = 'service_role';
+  -- Extract role from metadata (may be null)
+  extracted_role := new.raw_user_meta_data ->> 'role';
 
-    select decrypted_secret into frontend_url
-    from vault.decrypted_secrets
-    where name = 'frontend_url';
+  begin
+    insert into public.users (id, email, role)
+    values (new.id, new.email, extracted_role);
 
-    if project_ref is null or service_role is null or frontend_url is null then
-      raise exception 'Missing required Vault secrets.';
-    end if;
+    inserted := true;
+  exception when others then
+    insert into public.debug_trigger_log (context)
+    values ('handle_new_user ERROR: ' || SQLERRM);
+  end;
 
-    -- Construct function URL
-    fn_url := format('https://%s.functions.supabase.co/send_email_on_end', project_ref);
-
-    raise notice 'Trigger fired for session id %', NEW.id;
-
-    -- Perform the HTTP POST
-    perform net.http_post(
-      url := fn_url,
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', format('Bearer %s', service_role)
-      ),
-      body := jsonb_build_object(
-        'session_id', NEW.id,
-        'ended_at', NEW.ended_at,
-        'link', frontend_url || '/chat/' || NEW.id
-      )
-    );
+  if inserted then
+    insert into public.debug_trigger_log (context)
+    values ('handle_new_user SUCCESS: ' || new.id || ' / role: ' || coalesce(extracted_role, 'null'));
   end if;
 
-  return NEW;
+  return new;
 end;
+$$;
+
+--
+-- Name: handle_session_end(); Type: FUNCTION; Schema: public; Owner: -
+--
+create or replace function public.handle_session_end () RETURNS trigger LANGUAGE plpgsql SECURITY definer as $$
+DECLARE
+  project_url text;
+  service_role text;
+  fn_url text;
+  http_result jsonb;
+  frontend_url text;
+BEGIN
+  IF NEW.ended_at IS NOT NULL AND OLD.ended_at IS NULL THEN
+    -- Load secrets
+    SELECT decrypted_secret INTO project_url
+    FROM vault.decrypted_secrets
+    WHERE name = 'project_url';
+
+    SELECT decrypted_secret INTO service_role
+    FROM vault.decrypted_secrets
+    WHERE name = 'service_role';
+
+    SELECT decrypted_secret INTO frontend_url
+    FROM vault.decrypted_secrets
+    WHERE name = 'frontend_url';
+
+    IF project_url IS NULL OR service_role IS NULL THEN
+      RAISE EXCEPTION 'Missing required secrets.';
+    END IF;
+
+    fn_url := project_url || '/functions/v1/send_email_on_end';
+
+    BEGIN
+      http_result := net.http_post(
+  url := fn_url,
+  headers := jsonb_build_object(
+    'Content-Type', 'application/json',
+    'Authorization', 'Bearer ' || service_role
+  ),
+     body := jsonb_build_object(
+          'session_id', NEW.id,
+          'ended_at', NEW.ended_at,
+          'link', frontend_url || '/chat/' || NEW.id
+        )
+);
+
+    EXCEPTION WHEN OTHERS THEN
+      -- Optionally log error
+      INSERT INTO debug_trigger_log(context)
+      VALUES ('Trigger failed: ' || SQLERRM);
+    END;
+  END IF;
+
+  RETURN NEW;
+END;
 $$;
 
 
@@ -1244,8 +1233,32 @@ create table public.invite_logs (
   status text default 'pending'::text,
   accepted_at timestamp with time zone,
   token uuid default gen_random_uuid (),
-  retry_count integer default 0
+  retry_count integer default 0,
+  invite_url text
+  last_retry_at timestampz,
+  last_error text
 );
+
+create table admin_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references users(id),
+  action text not null,
+  details text null,
+  note text null,
+  created_at timestamp with time zone default now()
+);
+
+create index on admin_audit_logs (actor_id);
+create index on admin_audit_logs (created_at desc);
+create index on admin_audit_logs (action);
+
+create table if not exists public.app_settings (
+  key text primary key,
+  value text,
+  updated_at timestamp with time zone default now(),
+  updated_by uuid references users(id) on delete set null
+);
+
 
 --
 -- Name: messages; Type: TABLE; Schema: public; Owner: -
@@ -1366,7 +1379,7 @@ create table public.users (
   id uuid not null,
   full_name text,
   role text default 'user'::text,
-  created_at timestamp with time zone,
+  created_at timestamp with time zone default now(),
   email text,
   avatar_url text,
   short_description text
@@ -2128,9 +2141,9 @@ create policy "Allow message access via shared_with or team" on public.messages 
 --
 -- Name: fine_tune_snapshots Allow read for auth users; Type: POLICY; Schema: public; Owner: -
 --
-create policy "Allow read for auth users" on public.fine_tune_snapshots for
+create policy "Users can read their own snapshots" on public.fine_tune_snapshots for
 select
-  to authenticated using ((auth.role () = 'authenticated'::text));
+  to authenticated using ((auth.role () = 'authenticated'::text) AND (auth.uid() = user_id));
 
 --
 -- Name: folders Allow read if folder has treatments shared with user; Type: POLICY; Schema: public; Owner: -
@@ -2220,6 +2233,68 @@ select
       )
     )
   );
+
+CREATE OR REPLACE VIEW v_my_role AS
+SELECT id, role
+FROM users
+WHERE id = auth.uid();
+
+
+CREATE POLICY "Admins can read all users"
+ON users
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM v_my_role
+    WHERE role = 'admin'
+  )
+);
+
+-- Allows admins to "see" all rows (for aggregate functions like count(*))
+CREATE POLICY "Admins can count sessions"
+ON sessions
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM v_my_role WHERE role = 'admin'
+  )
+);
+
+-- Allows admins to "see" all rows (for aggregate functions like count(*))
+CREATE POLICY "Admins can count invites"
+ON invite_logs
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM v_my_role WHERE role = 'admin'
+  )
+);
+
+create or replace function admin_weekly_trends()
+returns table (
+  week text,
+  new_users integer,
+  new_sessions integer
+)
+language sql
+as $$
+  select
+    to_char(date_trunc('week', created_at), 'YYYY-MM-DD') as week,
+    count(*) filter (where source = 'users') as new_users,
+    count(*) filter (where source = 'sessions') as new_sessions
+  from (
+    select created_at, 'users' as source from users
+    union all
+    select created_at, 'sessions' as source from sessions
+  ) as combined
+  group by 1
+  order by 1;
+$$;
+
 
 --
 -- Name: invite_logs Allow service insert only; Type: POLICY; Schema: public; Owner: -
@@ -2351,11 +2426,14 @@ select
   );
 
 --
--- Name: invite_logs System can read invite logs; Type: POLICY; Schema: public; Owner: -
+-- Name: invite_logs users can read their own sent invites; Type: POLICY; Schema: public; Owner: -
 --
-create policy "System can read invite logs" on public.invite_logs for
-select
-  using (true);
+CREATE POLICY "Users can read their own sent invites"
+ON invite_logs
+FOR SELECT
+USING (
+  auth.uid() = inviter_id
+);
 
 --
 -- Name: users Team members can read users in their team; Type: POLICY; Schema: public; Owner: -
@@ -2465,35 +2543,33 @@ select
   );
 
 --
--- Name: invite_logs Users can update own invite_logs; Type: POLICY; Schema: public; Owner: -
+-- Name: invite_logs Users can update their sent invites; Type: POLICY; Schema: public; Owner: -
 --
-create policy "Users can update own invite_logs" on public.invite_logs
+create policy "Users can update their sent or received invites"
+on public.invite_logs
 for update
-  using (
-    (
-      to_email = (
-        select
-          users.email
-        from
-          public.users
-        where
-          (users.id = auth.uid ())
-      )
+using (
+  (
+    inviter_id = auth.uid()
+    OR
+    to_email = (
+      select users.email
+      from public.users
+      where users.id = auth.uid()
     )
   )
-with
-  check (
-    (
-      to_email = (
-        select
-          users.email
-        from
-          public.users
-        where
-          (users.id = auth.uid ())
-      )
+)
+with check (
+  (
+    inviter_id = auth.uid()
+    OR
+    to_email = (
+      select users.email
+      from public.users
+      where users.id = auth.uid()
     )
-  );
+  )
+);
 
 --
 -- Name: session_events Users can view events of sessions they own or have access to; Type: POLICY; Schema: public; Owner: -
@@ -2630,6 +2706,42 @@ select
       or (auth.uid () = any (shared_with))
     )
   );
+
+-- Enable RLS
+alter table admin_audit_logs enable row level security;
+
+CREATE POLICY "Users can read their own audit logs"
+ON admin_audit_logs
+FOR SELECT
+TO authenticated
+USING (
+  actor_id = auth.uid()
+);
+
+CREATE POLICY "Users can update their own audit logs"
+ON admin_audit_logs
+FOR UPDATE
+TO authenticated
+USING (
+  actor_id = auth.uid()
+)
+WITH CHECK (
+  actor_id = auth.uid()
+);
+
+CREATE POLICY "Admins can insert audit logs"
+ON admin_audit_logs
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM users
+    WHERE users.id = auth.uid()
+    AND users.role = 'admin'
+  )
+);
+
 
 --
 -- Name: SCHEMA public; Type: ACL; Schema: -; Owner: -

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useTransition, useCallback, useEffect, useState, useDeferredValue } from "react";
 import { toast } from "react-hot-toast";
 import { supabaseBrowserClient as supabase } from "@/libs/supabase"; // Assuming supabase client is used
 import { EmotionSummary, EmotionTrainingRow, ExportFilterOptions } from "@/types";
@@ -8,6 +8,7 @@ export function useExportTraining(
   filters: ExportFilterOptions | null = null,
   snapshotName?: string
 ) {
+  const deferredFilters = useDeferredValue(filters);
   const [loading, setLoading] = useState(false);
   const [filePath, setFilePath] = useState<string | null>(null);
   const [exportLocked, setExportLocked] = useState(false);
@@ -16,24 +17,28 @@ export function useExportTraining(
   const [selectedCount, setSelectedCount] = useState(0);
   const [totalCount, setTotalCount] = useState<number>(0);
 
+  const [isPending, startTransition] = useTransition();
+
   const fetchPreview = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/exports/export-fine-tune-preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(filters || {}),
+      body: JSON.stringify(deferredFilters || {}),
     });
     const json = await res.json();
     if (res.ok) {
-      setTotalAnnotations(json.total);
-      setSelectedCount(json.annotations.length);
-      setPreviewRows(json.annotations);
-      setTotalCount(json.total);
+      startTransition(() => {
+        setTotalAnnotations(json.total);
+        setSelectedCount(json.annotations.length);
+        setPreviewRows(json.annotations);
+        setTotalCount(json.total);
+      });
     } else {
       toast.error(json.error || "Failed to load preview");
     }
     setLoading(false);
-  }, [filters]);
+  }, [deferredFilters]);
 
   useEffect(() => {
     fetchPreview();
@@ -65,7 +70,7 @@ export function useExportTraining(
   };
 
   return {
-    loading,
+    loading: loading || isPending,
     filePath,
     exportLocked,
     previewRows,

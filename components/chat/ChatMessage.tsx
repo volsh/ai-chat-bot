@@ -13,13 +13,11 @@ import { getEmotionBadgeClass } from "@/utils/emotions/getEmotionBadgeClass";
 
 export default function ChatMessage({
   msg,
-  emotion,
   regenerate,
   loading = false,
   onRefresh,
 }: {
   msg: MessageWithEmotion;
-  emotion: MessageWithEmotion;
   regenerate: () => void;
   loading: boolean;
   onRefresh: () => void;
@@ -55,24 +53,24 @@ export default function ChatMessage({
       <div className="flex justify-between gap-1 text-xs text-gray-500 dark:text-gray-100">
         <span className="font-medium capitalize">{msg.message_role}</span>
         <span className="flex flex-wrap items-center gap-2">
-          {emotion && isTherapist && (
+          {msg.emotion && isTherapist && (
             <>
-              {emotion.flagged && (
+              {msg.flagged && (
                 <div
                   className="rounded bg-red-100 px-2 py-1 text-red-700"
-                  title={emotion.flag_reason || "Flagged by therapist"}
+                  title={msg.flag_reason || "Flagged by therapist"}
                 >
                   ⚠️ Flagged
                 </div>
               )}
-              {emotion.intensity && emotion.tone && (
-                <SeverityBadge intensity={emotion.intensity} tone={emotion.tone} />
+              {msg.intensity && msg.tone && (
+                <SeverityBadge intensity={msg.intensity} tone={msg.tone} />
               )}
               <div
-                className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${getEmotionBadgeClass(emotion.tone!, emotion.intensity!)}`}
-                title={`Emotion: ${emotion.emotion}, Intensity: ${emotion.intensity}`}
+                className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${getEmotionBadgeClass(msg.tone!, msg.intensity!)}`}
+                title={`Emotion: ${msg.emotion}, Intensity: ${msg.intensity}`}
               >
-                {emotion.emotion} <span>{emotion.intensity?.toFixed(2)}</span>
+                {msg.emotion} <span>{msg.intensity?.toFixed(2)}</span>
               </div>
             </>
           )}

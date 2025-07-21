@@ -51,7 +51,7 @@ export default function Modal({ onClose, children, initialFocusRef }: ModalProps
       document.removeEventListener("mousedown", handleClickOutside);
       previousActiveElement.current?.focus();
     };
-  }, [onClose, initialFocusRef]);
+  }, [initialFocusRef]);
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

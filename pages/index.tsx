@@ -1,6 +1,5 @@
 // pages/index.tsx
 import { GetServerSidePropsContext, NextApiRequest, NextApiResponse } from "next";
-import { redirectUserToChat } from "@/utils/chat/redirectUserToChat";
 import ssrGuard from "@/utils/auth/ssrGuard";
 import { createSupabaseServerClient } from "@/libs/supabase";
 
@@ -27,7 +26,19 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
         permanent: false,
       },
     };
-  return redirectUserToChat(context);
+  if (role === "admin")
+    return {
+      redirect: {
+        destination: "/dashboard/admin",
+        permanent: false,
+      },
+    };
+  return {
+    redirect: {
+      destination: "/treatments",
+      permanent: false,
+    },
+  };
 }
 
 export default function HomePage() {

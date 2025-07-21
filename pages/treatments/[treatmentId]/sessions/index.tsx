@@ -30,7 +30,7 @@ function SessionCardWithTimer({
 
   const createdAt = new Date(session.created_at!);
   const endsAt = new Date(createdAt.getTime() + 2 * 60 * 60 * 1000);
-  const isActive = now < endsAt;
+  const isActive = now < endsAt && !session.ended_at;
 
   const timeLeft = Math.max(0, endsAt.getTime() - now.getTime());
   const minutes = Math.floor(timeLeft / (1000 * 60));

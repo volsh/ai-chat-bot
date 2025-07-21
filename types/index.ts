@@ -15,3 +15,6 @@ export * from "./Team";
 export * from "./InviteLog";
 export * from "./Treatment";
 export * from "./Goal";
+export * from "./Snapshot";
+export * from "./AdminAuditLog";
+export * from "./AppSettings";

@@ -28,7 +28,6 @@ export default function AnnotationModal({
   const [correctedAlignmentScore, setCorrectedAlignmentScore] = useState(
     initialAnnotation?.alignment_score || 0
   );
-
   const [note, setNote] = useState(initialAnnotation?.note || "");
   const [flagReason, setFlagReason] = useState(initialAnnotation?.flag_reason || "");
   const [saving, setSaving] = useState(false);

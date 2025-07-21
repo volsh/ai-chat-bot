@@ -5,7 +5,7 @@ import { supabaseBrowserClient as supabase } from "@/libs/supabase";
 import toast from "react-hot-toast";
 import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
-import StatusBadge from "@/components/StatusBadge";
+import StatusBadge from "@/components/fineTuning/FineTuningStatusBadge";
 import { FineTuneEvent } from "@/types";
 import RetryModal from "@/components/RetryModal";
 import Spinner from "@/components/ui/spinner";

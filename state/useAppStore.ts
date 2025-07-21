@@ -21,6 +21,9 @@ interface AppState {
 
   setActiveSnapshot: (id?: string) => void;
   setRetryLock: (snapshotId: string, locked: boolean) => void;
+
+  actors: UserProfile[];
+  setActors: (actors: UserProfile[]) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -51,4 +54,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         [snapshotId]: locked,
       },
     })),
+
+  actors: [],
+  setActors: (actors) => set({ actors }),
 }));

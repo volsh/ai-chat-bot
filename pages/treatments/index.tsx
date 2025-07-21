@@ -241,7 +241,7 @@ export default function TreatmentsPage() {
                 />
                 <div>
                   <div className="flex items-center gap-2">
-                    {t.goal && <div className="text-lg font-semibold">{t.goal.title}</div>}
+                    {t.goal && <div className="text-lg font-semibold">{t.title}</div>}
                     {t.archived ? (
                       <ArchivedBadge isArchived={t.archived} />
                     ) : (
