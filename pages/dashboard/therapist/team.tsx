@@ -157,7 +157,9 @@ export default function TherapistTeam() {
       }
       if (data.length < PAGE_SIZE) setHasMoreInvites(false);
       if (!reset) pageRef.current++;
-      setInviteLogs((prev) => (reset ? data : [...prev, ...data]));
+      setInviteLogs((prev) =>
+        reset ? (data as InviteLog[]) : [...prev, ...(data as InviteLog[])]
+      );
     },
     [userId, logFilter, retryThreshold]
   );
